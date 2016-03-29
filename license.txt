@@ -1,0 +1,16 @@
+Most images and sounds used in this game are open-licensed, acquired from
+site opengameart.org
+
+Link for some of the assets:
+http://opengameart.org/content/more-explosions
+http://opengameart.org/content/explosion-animated
+http://opengameart.org/content/rockbreaking
+http://opengameart.org/content/single-and-multi-explosion
+http://opengameart.org/content/simple-explosion-bleeds-game-art
+http://opengameart.org/content/boom-pack-1
+http://opengameart.org/content/seamless-rock-texture-2
+http://opengameart.org/content/seamless-rock-texture
+
+
+Assets from other places:
+http://www.cs.cmu.edu/~junggon/tools/gear.png

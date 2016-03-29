@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+
+<html>
+<body>
+<style>
+.center {
+  margin: auto;
+  width: 1000px;
+}
+</style>
+<div class="center">
+<h1 style="text-align:center;font-family:Helvetica;">Mad Racer</h1>
+<canvas id="canvas" width="1000" height="700" style="border:1px solid #d3d3d3;"> Your browser does not support the HTML5 canvas tag.</canvas>
+<script src="game.js"></script>
+
+<script>
+    Game.initialize();
+
+    Game.run = (function() {
+        var loops = 0, skipTicks = 1000 / Game.fps,
+        maxFrameSkip = 10,
+        nextGameTick = (new Date).getTime();
+
+        return function() {
+            loops = 0;
+
+            while ((new Date).getTime() > nextGameTick) {
+                Game.update();
+                nextGameTick += skipTicks;
+                loops++;
+            }
+
+            Game.draw();
+        };
+    })();
+
+    (function() {
+        var onEachFrame;
+        if (window.webkitRequestAnimationFrame) {
+            onEachFrame = function(cb) {
+                var _cb = function() { cb(); webkitRequestAnimationFrame(_cb); }
+                _cb();
+            };
+        }
+        else if (window.mozRequestAnimationFrame) {
+                onEachFrame = function(cb) {
+                var _cb = function() { cb(); mozRequestAnimationFrame(_cb); }
+                _cb();
+            };
+        }
+        else {
+            onEachFrame = function(cb) {
+                setInterval(cb, 1000 / 60);
+            }
+        }
+
+        window.onEachFrame = onEachFrame;
+    })();
+
+    window.onEachFrame(Game.run);
+    window.addEventListener('keydown', Game.inputDown.bind(Game), false)
+    window.addEventListener('keyup', Game.inputUp.bind(Game), false)
+  </script>
+
+</body>
+</html>

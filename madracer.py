@@ -157,24 +157,30 @@ class SoundManager:
         self.vehicle_explosion = sf.SoundBuffer.from_file("sounds/vehicle_explosion.ogg")
         #no need to pre-load music file, its played differently by streaming
         self.sounds = []
-    def playSound(self, sound):
+    def playSound(self, sound, pos=None):
         s = sf.Sound(sound)
+        if pos != None:
+            sp = (pos - Game.track_pos) - (Game.player.pos - Game.track_pos)
+            sp = (sp / Game.track_area)*100
+            s.position = (sp.x, sp.y, 0)
+            s.attenuation = 0.5
+            s.min_distance = 10 #max dist where sound is heard full-volume, beyond this it attenuates
         s.play()
         self.sounds.append(s)
         return s
-    def playCollision(self):
+    def playCollision(self, pos=None):
         sound = self.__dict__["collision%i" % (1+int(random.random()*4))]
-        return self.playSound(sound)
-    def playHit(self):
+        return self.playSound(sound, pos)
+    def playHit(self, pos=None):
         hit_sounds = [self.explosion, self.hit1, self.hit2, self.hit3, self.hit4]
         sound = random.choice(hit_sounds)
-        return self.playSound(sound)
-    def playBombExplosion(self):
-        return self.playSound(self.bomb_explosion)
-    def playFire(self):
-        return self.playSound(self.fire)
-    def playVehicleExplosion(self):
-        return self.playSound(self.vehicle_explosion)
+        return self.playSound(sound, pos)
+    def playBombExplosion(self, pos=None):
+        return self.playSound(self.bomb_explosion, pos)
+    def playFire(self, pos=None):
+        return self.playSound(self.fire, pos)
+    def playVehicleExplosion(self, pos=None):
+        return self.playSound(self.vehicle_explosion, pos)
     def update(self):
         toremove = []
         for s in self.sounds:
@@ -406,7 +412,7 @@ class Player(BaseCar):
             dir.normalize()
 
             init_pos = self.center()
-            projectile = Projectile(init_pos.x, init_pos.y, self.shot_dmg, self.shot_speed, dir, 2)
+            projectile = Projectile(init_pos.x, init_pos.y, self.shot_dmg, self.shot_speed, dir, 2, sf.Color.GREEN)
             projectile.cant_hit.append(self.type)
             Game.entities.append(projectile)
             self.shots_available -= 1
@@ -506,7 +512,7 @@ class Slinger(BaseCar):
         if self.cooldown > self.time_to_shoot:
             #SHOOT!
             init_pos = self.center()
-            projectile = Projectile(init_pos.x, init_pos.y, 6, 15, dir, 2)
+            projectile = Projectile(init_pos.x, init_pos.y, 6, 15, dir, 2, sf.graphics.Color(255,180,180,255) )
             projectile.cant_hit.append(self.type)
             Game.entities.append(projectile)
             self.cooldown = 0.0
@@ -567,7 +573,7 @@ class WarRig(BaseCar):
         if self.cooldown > self.time_to_shoot:
             #SHOOT!
             init_pos = firing_pos
-            projectile = Projectile(init_pos.x, init_pos.y, 10, 15, dir, 2)
+            projectile = Projectile(init_pos.x, init_pos.y, 10, 15, dir, 2, sf.Color.RED )
             projectile.cant_hit.append(self.type)
             projectile.cant_hit.append('rigturret')
             Game.entities.append(projectile)
@@ -627,7 +633,7 @@ class RigTurret(BaseCar):
             init_pos = self.center()
             dir = Game.player.center() - init_pos
             dir.normalize()
-            projectile = Projectile(init_pos.x, init_pos.y, 5, 15, dir, 2)
+            projectile = Projectile(init_pos.x, init_pos.y, 5, 15, dir, 2, sf.graphics.Color(255,240,240,255))
             projectile.color = '#000080'
             projectile.cant_hit.append(self.type)
             projectile.cant_hit.append('warrig')
@@ -662,15 +668,16 @@ class RigTurret(BaseCar):
 
 #/*********** Projectile *****************
 class Projectile(BaseCar):
-    def __init__(self, x, y, dmg, speed, dir, lifetime):
+    def __init__(self, x, y, dmg, speed, dir, lifetime, color):
         BaseCar.__init__(self, 'projectile', x, y, 7, 7, 'blue', speed, 1, 0)
         self.dmg = dmg
         self.dir = dir.copy()
         self.lifetime = lifetime
+        self.spr.color = color
         self.show_life_bar = False
         self.cant_hit = ['projectile', 'bomb', 'powerup', 'quicksand']
-        s = Game.sounds.playFire()
-        s.volume = 50
+        s = Game.sounds.playFire(self.center())
+        #s.volume = 50
 
     def update(self, dt):
         self.lifetime -= dt
@@ -682,7 +689,7 @@ class Projectile(BaseCar):
             return
         self.hp = -1
         ent.hp -= self.dmg
-        Game.sounds.playHit()        
+        Game.sounds.playHit(self.center())        
         CreateExplosionAt(self, 20, 1, Game.animations['explosion%i'%(1+math.floor(random.random()*5))])
         if ent.type != 'player':
             #self means it is a projectile that hit something other than the player
@@ -728,7 +735,7 @@ class Bomb(BaseCar):
     def explode(self):
         self.hp = -1
         CreateExplosionAt(self, self.blast_radius*2, 1, Game.animations.bomb_explosion)
-        Game.sounds.playBombExplosion()
+        Game.sounds.playBombExplosion(self.center())
         for ent in Game.entities:
             if not isInArray(ent.type, self.cant_dmg):
                 for off in [(0,0), (0,1), (1,0), (1,1)]:
@@ -911,14 +918,14 @@ def CreateExplosionAt(ent, size, speed, type):
 
 def CreateVehicleExplosion(ent):
     CreateExplosionAt(ent, ent.original_size.len()*2, 1, Game.animations.vehicle_explosion)
-    Game.sounds.playVehicleExplosion()
+    Game.sounds.playVehicleExplosion(ent.center())
 
 def CreateVehicleCollision(ent1, ent2):
     #var pos = ent1.center().add(ent2.center().sub(ent1.center()).scale(0.5));
     pos = ent1.center() + (ent2.center()-ent1.center())*0.5
     size = (ent1.size.len()+ent2.size.len())/2
     CreateExplosion(pos, size, 1, Game.animations.vehicle_collision)
-    Game.sounds.playCollision()
+    Game.sounds.playCollision(pos)
 
 def CreateVehicleDustCloud(ent):
     #pos = ent.pos + ent.size*(-0.5,1)
@@ -950,7 +957,6 @@ class Game:
     sounds = SoundManager()
 
     def __init__(self):
-        self.music = sf.Music.from_file('sounds/music.ogg')
         self.scale_factor = Vector(1.0,1.0)
         def powerupFactory(x,y):
             return self.RandomizePowerUp(Vector(x,y), 1.0)
@@ -997,8 +1003,11 @@ class Game:
         self.track.texture_rectangle = sf.Rectangle((0, 2100), (self.original_track_area.x, self.original_track_area.y))
         self.delta_time = 1.0/self.fps
         self.actual_fps = self.fps
+        self.music = sf.Music.from_file('sounds/music.ogg')
         self.music.play()
         self.music.loop = True
+        self.music.volume = 80
+        sf.Listener.set_direction((0,1,0))
         
         self.paused = False
         self.cheats_enabled = cheatsEnabled
@@ -1049,29 +1058,30 @@ class Game:
         #text player keys: direita, right-align, branco *
         for i, s in enumerate(["Arrow keys", "D", "S", "Space"]):
             self.fixedHudText.append(GUIText(s, (self.window.width, (335+(i*18 + i*25))*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
+        
+        #text highscore: esquerda, left-align, branco *
+        self.fixedHudText.append(GUIText("Highscores:", (0,20*self.scale_factor.y), GUIText.HOR_LEFT, sf.Color.RED, 18*self.scale_factor.y))
         #text HSE points: esquerda, right-align, branco *
-        hsY = 70*self.scale_factor.y
-        for hse in Game.highscores:
+        hsY = 50*self.scale_factor.y
+        for i, hse in enumerate(Game.highscores):
+            #text HSE names: esquerda, left-align, amarelado *
+            hsName = str(i+1)+': '+hse.name
+            self.fixedHudText.append(GUIText(hsName, (0, hsY), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
+            hsY += 18*self.scale_factor.y
             self.fixedHudText.append(GUIText("%i"%(hse.points), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
             hsY += 18*self.scale_factor.y
             mins = hse.level-1
             secs = mins*60 - int(mins)*60
             mins = int(mins)
             self.fixedHudText.append(GUIText("%im%is"%(mins,secs), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
-            hsY += 45*self.scale_factor.y
+            hsY += 24*self.scale_factor.y
+            
         #text player data: direita, left_align, branco *
         self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (self.window.width-barWidth+6,25*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
         #text commands: direita, left_align, amarelado *
         self.fixedHudText.append(GUIText("Movement:\n\nFire:\n\nUse Bomb:\n\nPause:", (self.window.width-barWidth+6,315*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
         #text points: esquerda, left-align, branco *
         #self.fixedHudText.append(GUIText("Points:", (0,25), GUIText.HOR_LEFT, hsCor, 18))
-        #text highscore: esquerda, left-align, branco *
-        self.fixedHudText.append(GUIText("Highscores:", (0,20*self.scale_factor.y), GUIText.HOR_LEFT, sf.Color.RED, 18*self.scale_factor.y))
-        #text HSE names: esquerda, left-align, amarelado *
-        hsNames = ""
-        for i, hse in enumerate(Game.highscores):
-            hsNames += str(i+1)+': '+hse.name + "\n\n\n"
-        self.fixedHudText.append(GUIText(hsNames, (0, 50*self.scale_factor.y), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
 
         self.pausedTxt = GUIText("PAUSED", (self.window.width/2, self.window.height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
         self.pausedTxt.txt.style = sf.Text.BOLD
@@ -1367,6 +1377,9 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
             # close window: exit
             if type(event) is sf.CloseEvent:
                 window.close()
+            if type(event) is sf.ResizeEvent:
+                #Game.updateGraphics()
+                pass
             if type(event) is sf.KeyEvent:
                 if (event.code == sf.Keyboard.Q and event.control) or event.code == sf.Keyboard.ESCAPE:
                     window.close();
@@ -1378,6 +1391,9 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
                     else:
                         windowsize = (1000, 700)
                         window.recreate(sf.VideoMode(*windowsize), windowtitle)
+                    window.icon = icon.pixels
+                    window.vertical_synchronization = vsync
+                    window.mouse_cursor_visible = False
                     Game.updateGraphics()
                     tfps.position = (window.width-250, window.height-60)
                 elif event.code == sf.Keyboard.F and event.control and event.released:

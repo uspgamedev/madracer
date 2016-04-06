@@ -117,7 +117,7 @@ class Game:
         with open("./highscores", 'rb') as fh:
             highscores = pickle.load(fh)
     except:
-        highscores = [HighscoreEntry('-----', 0, 0.0) for i in xrange(10)]
+        highscores = [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)]
     
     images = TextureManager()
     animations = AnimationManager(images)

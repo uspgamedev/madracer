@@ -1,0 +1,18 @@
+#Game files
+highscores
+
+# Python files
+*.pyc
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Sublime files
+*.sublime-project
+*.sublime-workspace
+

@@ -278,11 +278,6 @@ class Game:
         #self.track_area = self.original_track_area * self.scale_factor
         #self.track_pos = self.original_track_pos * self.scale_factor
         
-        #self.track_area = Vector(self.window.height,
-        #                         self.window.height * self.original_track_area.x / self.original_track_area.y)
-        #self.track_pos = Vector( (self.window.width - self.track_area.x)/2, 0 )
-        #self.scale_factor = Vector( (self.track_pos.x*2 +self.track_area.x)/1000, self.track_area.y/700)
-        
         #p = self.original_track_pos.x / self.original_track_area.x
         #self.track_area = Vector(self.window.width * (1-p*2), self.window.height)
         #self.track_pos = Vector(self.window.width * p, 0)

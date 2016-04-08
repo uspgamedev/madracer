@@ -6,7 +6,7 @@ from scripts.game import Game, input
 
 ################################################################
 
-def executeGame(fullscreen, cheatsEnabled, vsync):
+def executeGame(fullscreen, cheatsEnabled, vsync, stretch):
     windowtitle = "Mad Racer"
     if fullscreen:
         windowsize, _ = sf.VideoMode.get_desktop_mode()
@@ -21,7 +21,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
         print "error"
         exit(1)
     
-    Game.initialize(window, font, cheatsEnabled)
+    Game.initialize(window, font, cheatsEnabled, stretch)
     
     icon = Game.images.player.to_image()
     window.icon = icon.pixels
@@ -46,8 +46,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
             if type(event) is sf.CloseEvent:
                 window.close()
             if type(event) is sf.ResizeEvent:
-                #Game.updateGraphics()
-                pass
+                Game.updateGraphics()
             if type(event) is sf.FocusEvent:
                 Game.paused = event.lost
             if type(event) is sf.KeyEvent:
@@ -103,5 +102,7 @@ if __name__ == "__main__":
     parser.add_argument("--fullscreen", "-f", action="store_true", default=False, help="If the window should start fullscreen. self can be toggled during execution (default no)")
     parser.add_argument("--cheats", "-c", action="store_true", default=False, help="If cheats should be enabled.")
     parser.add_argument("--vsync", "-vs", action="store_true", default=False, help="If VSync should be enabled.")
+    parser.add_argument("--stretch", "-s", action="store_true", default=False, help="If true, graphics will be stretched to fit window. If false (default), graphics will "+
+        "maintain the original intended aspect-ratio, but might cause black bars on window borders due to unused empty space.")
     args = parser.parse_args()
-    executeGame(args.fullscreen, args.cheats, args.vsync)
+    executeGame(args.fullscreen, args.cheats, args.vsync, args.stretch)

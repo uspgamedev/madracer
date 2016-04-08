@@ -151,7 +151,7 @@ class Game:
             EntityGenerator('rigs', [60.0, 60.0], [('warrig',1.0)], lambda: round(Game.speed_level) - 1)
         ]
         
-    def initialize(self, window, font, cheatsEnabled):
+    def initialize(self, window, font, cheatsEnabled, stretchView):
         self.window = window
         self.font = font
         self.entities = []
@@ -178,6 +178,7 @@ class Game:
         self.cheated = False
         self.generate_entities = True
         
+        self.stretchView = stretchView
         self.updateGraphics()
         self.player_name = []
         self.player = Player(400*self.scale_factor.x, 400*self.scale_factor.y)
@@ -190,14 +191,15 @@ class Game:
         self.clock.restart()
         
     def initGraphics(self):
-        self.track.ratio = self.scale_factor.toSFML()
+        #self.track.ratio = self.scale_factor.toSFML()
         self.track.position = (self.track_pos).toSFML()
         
         barWidth = self.track_pos.x
         txtScale = self.scale_factor.x
+        width, height = self.window.view.size
         
         def createBar(x, w, color):
-            bar = sf.RectangleShape((w, self.window.height))
+            bar = sf.RectangleShape((w, height))
             bar.fill_color = color
             bar.position = x, 0
             return bar
@@ -216,18 +218,18 @@ class Game:
         #text player values: direita, right-align, branco
         self.plaDataTxts = []
         for i in xrange(4):
-            self.plaDataTxts.append(GUIText("-", (self.window.width, 25*txtScale + 40*(i)*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
+            self.plaDataTxts.append(GUIText("-", (width, 25*txtScale + 40*(i)*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
         
         self.fixedHudText = []
         #text commands: direita, left_align, amarelado *
         #text player keys: direita, right-align, branco *
         ckY = self.plaDataTxts[-1].txt.position.y + 2*18*txtScale#25*txtScale + 40*3*txtScale + 2*18*txtScale #pos a little below the last text
-        self.fixedHudText.append(GUIText(self.input.name, (self.window.width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18*txtScale))
+        self.fixedHudText.append(GUIText(self.input.name, (width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18*txtScale))
         ckY += 18*txtScale
         for cmd, key in self.input.command_list():
-            self.fixedHudText.append(GUIText(cmd, (self.window.width-barWidth+6, ckY), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
+            self.fixedHudText.append(GUIText(cmd, (width-barWidth+6, ckY), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
             ckY += 18*self.scale_factor.y
-            self.fixedHudText.append(GUIText(key, (self.window.width, ckY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
+            self.fixedHudText.append(GUIText(key, (width, ckY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
             ckY += 24*self.scale_factor.y
         
         #text highscore: esquerda, left-align, branco *
@@ -248,38 +250,65 @@ class Game:
             hsY += 24*self.scale_factor.y
             
         #text player data: direita, left_align, branco *
-        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (self.window.width-barWidth+6,5*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
+        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (width-barWidth+6,5*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
         #text points: esquerda, left-align, branco *
         #self.fixedHudText.append(GUIText("Points:", (0,25), GUIText.HOR_LEFT, hsCor, 18))
 
-        self.pausedTxt = GUIText("PAUSED", (self.window.width/2, self.window.height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
+        self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
         self.pausedTxt.txt.style = sf.Text.BOLD
         self.pausedTxt.outline_color = sf.Color.RED
         
-        self.gameOverTxt = GUIText("GAME OVER", (self.window.width/2, self.window.height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
+        self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
         self.gameOverTxt.txt.style = sf.Text.BOLD
         self.gameOverTxt.outline_color = sf.Color.RED
         
         restxt = "Type in highscore name (max 8 chars):\n\n\nPress ENTER to start a new game."
-        self.restartTxt = GUIText(restxt, (self.window.width/2, self.window.height/2 + 40*txtScale), GUIText.HOR_CENTER, sf.Color.BLACK, 20*txtScale)
+        self.restartTxt = GUIText(restxt, (width/2, height/2 + 40*txtScale), GUIText.HOR_CENTER, sf.Color.BLACK, 20*txtScale)
         self.restartTxt.txt.style = sf.Text.BOLD
         self.restartTxt.outline_color = sf.Color.RED
         
-        self.plaNameTxt = GUIText("-", (self.window.width/2, self.window.height/2 + 70*txtScale), GUIText.HOR_CENTER, sf.Color.BLACK, 30*txtScale)
+        self.plaNameTxt = GUIText("-", (width/2, height/2 + 70*txtScale), GUIText.HOR_CENTER, sf.Color.BLACK, 30*txtScale)
         self.plaNameTxt.txt.style = sf.Text.BOLD
         self.plaNameTxt.outline_color = sf.Color.RED
         
-        
     def updateGraphics(self):
         #to be executed when window changes size (ex.: change fullscreen status
-        oldfactor = self.scale_factor
-        self.scale_factor = Vector(self.window.width/1000.0, self.window.height/700.0)
-        self.track_pos = self.original_track_pos * self.scale_factor
-        self.track_area = self.original_track_area * self.scale_factor
-        for ent in self.entities:
-            ent.updateGraphics(oldfactor)
-        for eff in self.effects:
-            eff.updateGraphics(oldfactor)
+        #oldfactor = self.scale_factor
+        #self.scale_factor = Vector(self.window.width/1000.0, self.window.height/700.0)
+        #self.track_area = self.original_track_area * self.scale_factor
+        #self.track_pos = self.original_track_pos * self.scale_factor
+        
+        #self.track_area = Vector(self.window.height,
+        #                         self.window.height * self.original_track_area.x / self.original_track_area.y)
+        #self.track_pos = Vector( (self.window.width - self.track_area.x)/2, 0 )
+        #self.scale_factor = Vector( (self.track_pos.x*2 +self.track_area.x)/1000, self.track_area.y/700)
+        
+        #p = self.original_track_pos.x / self.original_track_area.x
+        #self.track_area = Vector(self.window.width * (1-p*2), self.window.height)
+        #self.track_pos = Vector(self.window.width * p, 0)
+        #self.scale_factor = Vector(self.window.width/1000.0, self.window.height/700.0)
+        
+        self.track_area = self.original_track_area
+        self.track_pos = self.original_track_pos
+        self.window.view = sf.View((0,0,1000,700))
+        self.scale_factor = Vector(1,1)
+        orisize = Vector(1000,700)
+        if not self.stretchView:
+            if self.window.width/orisize.x > self.window.height/orisize.y:
+                # eixo Y eh o base
+                ww = self.window.height * orisize.x / orisize.y
+                ww = ww / self.window.width
+                self.window.view.viewport = ((1.0 - ww)/2, 0.0, ww, 1.0)
+            else:
+                # eixo X eh o base
+                hh = self.window.width * orisize.y / orisize.x
+                hh = hh / self.window.height
+                self.window.view.viewport = (0.0, (1.0 - hh)/2, 1.0, hh)
+        
+        #for ent in self.entities:
+        #    ent.updateGraphics(oldfactor)
+        #for eff in self.effects:
+        #    eff.updateGraphics(oldfactor)
         self.initGraphics()
         
     def getIDfor(self, ent):
@@ -319,7 +348,6 @@ class Game:
             eff.draw(self.window)
         
         if self.player.hp <= 0:
-            
             self.gameOverTxt.draw(self.window)
             if self.cheated:
                 self.restartTxt.set_text("Press ENTER to start a new game.\nCheating disables highscores.")
@@ -334,7 +362,7 @@ class Game:
                 self.pausedTxt.draw(self.window)
             if self.input.target_dir() != None:
                 self.input.drawPlayerTarget(self.window)
-
+        
     ####### UPDATE
     def update(self):
         ### debugging feature to run SUPER!HOT! (frame-per-frame)
@@ -443,7 +471,7 @@ class Game:
                     if hs_index >= 0 and not self.cheated:
                         self.highscores.pop()
                         self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.points), self.speed_level) )
-                    self.initialize(self.window, self.font, self.cheats_enabled)
+                    self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView)
                     #save highscores
                     with open("./highscores", 'wb') as fh:
                         pickle.dump(self.highscores, fh)

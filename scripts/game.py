@@ -414,6 +414,13 @@ class Game:
                 self.track.texture_rectangle = sf.Rectangle((0, 2100), (self.original_track_area.x, self.original_track_area.y))
 
     ####### INPUT
+    def processTextInput(self, e):
+        if self.player.hp <= 0:
+            if not e.unicode in [8,13] and len(self.player_name) < 8: # any text char, except newline and backspace
+                try:
+                    self.player_name.append( chr(e.unicode) )
+                except:
+                    print "ERROR: Strange text key entered"
     def processInput(self, e):
         if not e.released:
             if self.player.hp <= 0: return
@@ -427,10 +434,7 @@ class Game:
             self.cont = True
         else:
             if self.player.hp <= 0:
-                if e.code >= sf.Keyboard.A and e.code <= sf.Keyboard.Z and len(self.player_name) < 8: #A-Z
-                    ic = 'A' if e.shift else 'a'
-                    self.player_name.append( chr(ord(ic) + e.code) )
-                elif e.code == sf.Keyboard.BACK_SPACE and len(self.player_name) > 0: #backspace
+                if e.code == sf.Keyboard.BACK_SPACE and len(self.player_name) > 0: #backspace
                     self.player_name.pop()
                 elif e.code == sf.Keyboard.RETURN: #enter
                     if len(self.player_name) == 0:   

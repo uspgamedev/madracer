@@ -56,6 +56,8 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
                 else:
                     Game.processInput(event)
                     Game.input.receiveInputEvent(event)
+            if type(event) is sf.TextEvent:
+                Game.processTextInput(event)
             if type(event) in [sf.MouseWheelEvent, sf.MouseButtonEvent, sf.MouseMoveEvent, sf.JoystickMoveEvent, sf.JoystickButtonEvent, sf.JoystickConnectEvent]:
                 Game.input.receiveInputEvent(event)
         

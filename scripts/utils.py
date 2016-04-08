@@ -117,7 +117,11 @@ class GUIText:
     def text(self):
         return self.txt.string
     def set_text(self, s):
-        self.txt.string = s
+        try:
+            self.txt.string = s
+        except:
+            self.txt.string = "<ERROR>"
+            print "ERROR: Cant display string '%s'" % (s)
         self.updateOrigin()
         
     def set_align(self, a):

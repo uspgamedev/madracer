@@ -90,12 +90,12 @@ class BaseCar:
         elif center.x > pos.x + size.x:
             self.pos.x = pos.x + size.x - self.size.x/2
             moved = True
-        if center.y < pos.y:
-            self.pos.y = pos.y - self.size.y/2
-            moved = True
-        elif center.y > pos.y + size.y:
+        if center.y > pos.y + size.y:
             self.pos.y = pos.y + size.y - self.size.y/2
             moved = True
+        #elif center.y < pos.y:
+        #    self.pos.y = pos.y - self.size.y/2
+        #    moved = True
         return moved
 
     def center(self):

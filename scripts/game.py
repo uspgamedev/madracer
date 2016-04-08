@@ -388,12 +388,14 @@ class Game:
                             cumulative = 0.0
                             for type, chance in gen.entities:
                                 if entIndex < chance + cumulative:
-                                    factory = self.entityFactory[type]
                                     X = random.random()*self.track_area.x
-                                    Y = -10
+                                    newEnt = self.entityFactory[type](X+self.track_pos.x, 0)
+                                    
+                                    Y = -newEnt.size.y
                                     if random.random() < 0.25 and isInArray(type, possibleBottomEntTypes):
-                                        Y = self.track_area.y - 50
-                                    self.entities.append(factory(X+self.track_pos.x, Y+self.track_pos.y))
+                                        Y = self.track_area.y - newEnt.size.y*0.55
+                                    newEnt.pos.y = Y - self.track_pos.y
+                                    self.entities.append(newEnt)
                                     if type == 'warrig': #special case...
                                         self.entities[-1].createTurrets()
                                     #print "Generating entity "+type

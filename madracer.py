@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sfml as sf
-from scripts.game import Game
+from scripts.game import Game, input
 
 ################################################################
 
@@ -30,7 +30,9 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
     
     tfps = sf.Text("-", font, character_size=25)
     tfps.color = sf.Color.RED
-    tfps.position = (window.width-250, window.height-60)
+    def updateFPStextPos():
+        tfps.position = Game.track_pos.x, 5#(window.width-250, window.height-60)
+    updateFPStextPos()
     showFps = True
     
     clock = sf.Clock()
@@ -49,26 +51,34 @@ def executeGame(fullscreen, cheatsEnabled, vsync):
             if type(event) is sf.FocusEvent:
                 Game.paused = event.lost
             if type(event) is sf.KeyEvent:
-                if (event.code == sf.Keyboard.Q and event.control) or event.code == sf.Keyboard.ESCAPE:
+                if event.code == sf.Keyboard.ESCAPE:
                     window.close();
-                elif event.code == sf.Keyboard.RETURN and event.control and event.released:
-                    fullscreen = not fullscreen
-                    if fullscreen:
-                        windowsize, _ = sf.VideoMode.get_desktop_mode()
-                        window.recreate(sf.VideoMode(*windowsize), windowtitle, sf.Style.FULLSCREEN)
-                    else:
-                        windowsize = (1000, 700)
-                        window.recreate(sf.VideoMode(*windowsize), windowtitle)
-                    window.icon = icon.pixels
-                    window.vertical_synchronization = vsync
-                    window.mouse_cursor_visible = False
-                    Game.updateGraphics()
-                    tfps.position = (window.width-250, window.height-60)
-                elif event.code == sf.Keyboard.F and event.control and event.released:
-                    showFps = not showFps
                 else:
-                    Game.input(event)
-                
+                    Game.processInput(event)
+                    Game.input.receiveInputEvent(event)
+            if type(event) in [sf.MouseWheelEvent, sf.MouseButtonEvent, sf.MouseMoveEvent, sf.JoystickMoveEvent, sf.JoystickButtonEvent, sf.JoystickConnectEvent]:
+                Game.input.receiveInputEvent(event)
+        
+        for cmd in Game.input.loop_commands:
+            if cmd == input.InputInterface.CLOSE:
+                window.close();
+            elif cmd == input.InputInterface.TOGGLE_FULLSCREEN:
+                fullscreen = not fullscreen
+                if fullscreen:
+                    windowsize, _ = sf.VideoMode.get_desktop_mode()
+                    window.recreate(sf.VideoMode(*windowsize), windowtitle, sf.Style.FULLSCREEN)
+                else:
+                    windowsize = (1000, 700)
+                    window.recreate(sf.VideoMode(*windowsize), windowtitle)
+                window.icon = icon.pixels
+                window.vertical_synchronization = vsync
+                window.mouse_cursor_visible = False
+                Game.updateGraphics()
+                updateFPStextPos()
+            elif cmd == input.InputInterface.TOGGLE_FPS_DISPLAY:
+                showFps = not showFps
+        Game.input.loop_commands = []
+        
         window.clear() # clear screen
 
         elapsed = clock.restart()

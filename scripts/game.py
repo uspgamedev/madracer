@@ -126,6 +126,7 @@ class Game:
     def __init__(self):
         pass
     def build(self):
+        self.input_index = 0
         self.original_track_pos = Vector(100, 0)
         self.original_track_area = Vector(800, 700)
         self.scale_factor = Vector(1.0,1.0)
@@ -155,6 +156,8 @@ class Game:
         self.font = font
         self.entities = []
         self.effects = []
+        
+        self.input = input.available_inputs[self.input_index]()
         
         self.entCount = 0
         self.cont = True
@@ -213,12 +216,19 @@ class Game:
         #text player values: direita, right-align, branco
         self.plaDataTxts = []
         for i in xrange(4):
-            self.plaDataTxts.append(GUIText("-", (self.window.width, 45*txtScale + 40*(i)*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
+            self.plaDataTxts.append(GUIText("-", (self.window.width, 25*txtScale + 40*(i)*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
         
         self.fixedHudText = []
+        #text commands: direita, left_align, amarelado *
         #text player keys: direita, right-align, branco *
-        for i, s in enumerate(["Arrow keys", "D", "S", "Space"]):
-            self.fixedHudText.append(GUIText(s, (self.window.width, (335+(i*18 + i*25))*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
+        ckY = self.plaDataTxts[-1].txt.position.y + 2*18*txtScale#25*txtScale + 40*3*txtScale + 2*18*txtScale #pos a little below the last text
+        self.fixedHudText.append(GUIText(self.input.name, (self.window.width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18*txtScale))
+        ckY += 18*txtScale
+        for cmd, key in self.input.command_list():
+            self.fixedHudText.append(GUIText(cmd, (self.window.width-barWidth+6, ckY), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
+            ckY += 18*self.scale_factor.y
+            self.fixedHudText.append(GUIText(key, (self.window.width, ckY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
+            ckY += 24*self.scale_factor.y
         
         #text highscore: esquerda, left-align, branco *
         self.fixedHudText.append(GUIText("Highscores:", (0,20*self.scale_factor.y), GUIText.HOR_LEFT, sf.Color.RED, 18*self.scale_factor.y))
@@ -238,9 +248,7 @@ class Game:
             hsY += 24*self.scale_factor.y
             
         #text player data: direita, left_align, branco *
-        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (self.window.width-barWidth+6,25*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
-        #text commands: direita, left_align, amarelado *
-        self.fixedHudText.append(GUIText("Movement:\n\nFire:\n\nUse Bomb:\n\nPause:", (self.window.width-barWidth+6,315*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
+        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (self.window.width-barWidth+6,5*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
         #text points: esquerda, left-align, branco *
         #self.fixedHudText.append(GUIText("Points:", (0,25), GUIText.HOR_LEFT, hsCor, 18))
 
@@ -261,10 +269,6 @@ class Game:
         self.plaNameTxt.txt.style = sf.Text.BOLD
         self.plaNameTxt.outline_color = sf.Color.RED
         
-        self.targetDisplay = sf.RectangleShape()
-        self.targetDisplay.fill_color = sf.Color.TRANSPARENT
-        self.targetDisplay.outline_color = sf.Color.GREEN
-        self.targetDisplay.outline_thickness = 2
         
     def updateGraphics(self):
         #to be executed when window changes size (ex.: change fullscreen status
@@ -328,12 +332,8 @@ class Game:
         else:
             if self.paused:
                 self.pausedTxt.draw(self.window)
-            if self.player.target != None:
-                tpos = self.player.target.pos - Vector(10,10)
-                tsize = self.player.target.size + Vector(20,20)
-                self.targetDisplay.position = tpos.toSFML()
-                self.targetDisplay.size = tsize.toSFML()
-                self.window.draw(self.targetDisplay)
+            if self.input.target_dir() != None:
+                self.input.drawPlayerTarget(self.window)
 
     ####### UPDATE
     def update(self):
@@ -349,6 +349,7 @@ class Game:
         self.delta_time = dt
         
         self.sounds.update()
+        self.input.update(dt)
         
         if self.player.hp > 0 and not self.paused:
             # generate new entities
@@ -413,7 +414,7 @@ class Game:
                 self.track.texture_rectangle = sf.Rectangle((0, 2100), (self.original_track_area.x, self.original_track_area.y))
 
     ####### INPUT
-    def input(self, e):
+    def processInput(self, e):
         if not e.released:
             if self.player.hp <= 0: return
             if self.cheats_enabled:
@@ -424,7 +425,6 @@ class Game:
                     self.player.bombs += 1
                     self.cheated = True
             self.cont = True
-            self.player.input(e)
         else:
             if self.player.hp <= 0:
                 if e.code >= sf.Keyboard.A and e.code <= sf.Keyboard.Z and len(self.player_name) < 8: #A-Z
@@ -464,11 +464,16 @@ class Game:
                     elif e.code == sf.Keyboard.G:
                         self.generate_entities = not self.generate_entities
                         self.cheated = True
-                if e.code == sf.Keyboard.SPACE:
-                    #pause game
-                    self.paused = not self.paused
-                if not self.paused:
-                    self.player.input(e)
+                    
+    def pause(self):
+        self.paused = not self.paused
+        
+    def changeInput(self):
+        self.input_index += 1
+        if self.input_index >= len(input.available_inputs):
+            self.input_index = 0
+        self.input = input.available_inputs[self.input_index]()
+        self.updateGraphics()
 
     def getHSindex(self):
         hs_index = -1
@@ -483,5 +488,6 @@ Game = Game()
 from utils import Vector, GUIText
 from powerup import RandomizePowerUp
 from entities import *
+import input
 
 Game.build()

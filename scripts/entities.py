@@ -120,7 +120,6 @@ class BaseCar:
 class Player(BaseCar):
     def __init__(self, x, y):
         BaseCar.__init__(self, 'player', x, y, 32, 60, 'black', 4, 150, 0)
-        self.desired_move = Vector(0,0)
         self.bombs = 3
         self.max_shots = 25
         self.shots_available = self.max_shots
@@ -128,24 +127,18 @@ class Player(BaseCar):
         self.cooldown_time = 0.1
         self.cooldown_elapsed = self.cooldown_time
         self.reload_elapsed = 0.0
-        self.target = None
         self.shot_dmg = 20
         self.shot_speed = 15
-        self.try_fire = False
         self.turret = Turret(self)
 
     def draw(self, window):
         BaseCar.drawEntity(self, window)
         BaseCar.drawHPBar(self, window)
-        dir = None
-        if self.target != None:
-            dir = self.target.center() - self.center()
-            dir.normalize()
+        dir = Game.input.target_dir()
         self.turret.draw(window, dir)
 
     def update(self, dt):
-        moveDelta = self.desired_move.copy()
-        moveDelta.normalize()
+        moveDelta = Game.input.move_dir().copy()
         self.move(moveDelta)
         CreateVehicleDustCloud(self)
         
@@ -155,23 +148,11 @@ class Player(BaseCar):
                 self.reload_elapsed = 0.0
                 self.shots_available += 1
         
-        self.target = None
-        min_dist = Game.track_area.squaredLen()
-        validTargets = ['berserker', 'slinger', 'warrig', 'rigturret']
-        for i in xrange(1, len(Game.entities)):
-            ent = Game.entities[i]
-            if ent.hp <= 0 or not isInArray(ent.type, validTargets):
-                continue
-            dist = ent.center() - self.center()
-            if dist.squaredLen() < min_dist: #yay raizes desnecessarias!
-                min_dist = dist.squaredLen()
-                self.target = ent
-        
         self.cooldown_elapsed += dt
-        if self.target != None and self.try_fire and self.cooldown_elapsed >= self.cooldown_time and self.shots_available > 0:
-            dir = self.target.center() - self.center()
-            dir.normalize()
 
+    def fire(self):
+        if self.cooldown_elapsed >= self.cooldown_time and self.shots_available > 0:
+            dir = Game.input.target_dir()
             init_pos = self.center()
             projectile = Projectile(init_pos.x, init_pos.y, self.shot_dmg, self.shot_speed, dir, 2, sf.Color.GREEN)
             projectile.cant_hit.append(self.type)
@@ -179,24 +160,19 @@ class Player(BaseCar):
             self.shots_available -= 1
             self.reload_elapsed = 0.0
             self.cooldown_elapsed = 0.0
-
-    def input(self, e):
-        isDown = not e.released
-        if e.code == sf.Keyboard.LEFT and (isDown or (not isDown and self.desired_move.x == -1)): #left 
-            self.desired_move.x = -1*isDown
-        elif e.code == sf.Keyboard.UP and (isDown or (not isDown and self.desired_move.y == -1)): #up
-            self.desired_move.y = -1*isDown
-        elif e.code == sf.Keyboard.RIGHT and (isDown or (not isDown and self.desired_move.x == 1)): #right
-            self.desired_move.x = 1*isDown
-        elif e.code == sf.Keyboard.DOWN and (isDown or (not isDown and self.desired_move.y == 1)): #down
-            self.desired_move.y = 1*isDown
-        elif e.code == sf.Keyboard.D:
-            #shoot back!
-            self.try_fire = isDown
-        elif e.code == sf.Keyboard.S and not isDown and self.bombs > 0:
+            
+    def release_bomb(self):
+        if self.bombs > 0:
             #release bomb
             self.bombs -= 1
-            bomb = Bomb(self.pos.x, self.pos.y, 1)
+            bomb = Bomb(self.pos.x, self.pos.y, Vector(0,1), 1, 120, 200)
+            Game.entities.append(bomb)
+    def shoot_bomb(self):
+        if self.bombs > 0 and Game.input.target_dir() != None:
+            #shoot bomb
+            self.bombs -= 1
+            dir = Game.input.target_dir()
+            bomb = Bomb(self.pos.x, self.pos.y, dir, 2, 90, 120)
             Game.entities.append(bomb)
 
     def collidedWith(self, ent):
@@ -461,13 +437,13 @@ class Projectile(BaseCar):
 
 #*********** Bomb ************************
 class Bomb(BaseCar):
-    def __init__(self, x, y, speed):
+    def __init__(self, x, y, dir, speed, dmg, radius):
         BaseCar.__init__(self, 'bomb', x, y, 30, 30, 'purple', speed, 1, 0)
-        self.dmg = 100
-        self.blast_radius = 140
-        self.dir = Vector(0, 1)
+        self.dmg = dmg
+        self.blast_radius = radius
+        self.dir = dir
         self.show_life_bar = False
-        self.cant_hit = ['player', 'projectile', 'bomb', 'powerup', 'quicksand'] #bomb projectile doesnt hit
+        self.cant_hit = ['player', 'projectile', 'powerup', 'quicksand'] #bomb projectile doesnt hit
         self.cant_dmg = ['player', 'powerup'] #bomb area dmg does not apply
         self.considers_game_speed = True
         self.lifetime = 1.0
@@ -528,7 +504,7 @@ class Rock(BaseCar):
     def collidedWith(self, ent):
         if ent.type == 'rock' or ent.type == 'quicksand':
             return
-        if ent.type == 'projectile' or ent.type == 'powerup':
+        if ent.type == 'projectile' or ent.type == 'powerup' or ent.type == 'bomb':
             ent.collidedWith(self)
             return
         ent.hp = -1 #K.O.!

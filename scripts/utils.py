@@ -143,3 +143,43 @@ class GUIText:
             self.txt.position = pos
             self.updateOrigin()
         window.draw(self.txt)
+
+def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret']):
+    target = None
+    min_dist = game.Game.track_area.squaredLen()
+    for i in xrange(1, len(game.Game.entities)):
+        ent = game.Game.entities[i]
+        if ent.hp <= 0 or not ent.type in validTargets:
+            continue
+        dist = ent.center() - point
+        if dist.squaredLen() < min_dist: #yay raizes desnecessarias!
+            min_dist = dist.squaredLen()
+            target = ent
+    return target
+        
+def createPointMark(pos, radius, color):
+    circle_res = 16 #in line segments
+    mark = sf.VertexArray(sf.PrimitiveType.LINES, 2*(2+circle_res))
+    mark.position = pos
+    circle_points = []
+    angle_step = 2 * pi / circle_res
+    angle = 0.0
+    for i in xrange(circle_res):
+        dir = sf.Vector2(cos(angle), sin(angle))
+        p = dir*radius
+        circle_points.append(p)
+        circle_points.append(p)
+        angle += angle_step
+    circle_points.append(circle_points.pop(0))
+    for i in xrange(circle_res*2):
+        mark[i].position = circle_points[i]
+        mark[i].color = color
+        
+    cross = [sf.Vector2(radius, 0), #left
+             sf.Vector2(-radius, 0), #right
+             sf.Vector2(0, radius), #top
+             sf.Vector2(0, -radius)] #bottom
+    for i in xrange(4):
+        mark[circle_res*2 + i].position = cross[i]
+        mark[circle_res*2 + i].color = color
+    return mark

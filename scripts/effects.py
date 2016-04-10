@@ -3,18 +3,18 @@
 
 import sfml as sf
 import random, math
-from utils import Vector
+from utils import Vector, GUIText
 from game import Game
 
 #******************************** EFFECTS ************************************
+### EXPLOSIONS?!?
 class Explosion:
     def __init__(self, center, size, speed, type):
         self.base_speed = speed
-        self.original_size = Vector(size,size)
-        self.size = self.original_size * Game.scale_factor
-        self.size.x = self.size.y * self.original_size.x / self.original_size.y
+        self.size = Vector(size,size)
         self.pos = center - self.size*0.5
         self.destroyed = False
+        self.priority = 1
         self.dir = Vector(0, 1)
 
         self.type = type
@@ -46,12 +46,6 @@ class Explosion:
         if self.limitInRect(Game.track_pos, Game.track_area) or self.frame_index >= self.type.num_frames:
             self.destroyed = True
 
-    def updateGraphics(self, oldfactor):
-        relcenter = self.center() / (Game.original_track_area * oldfactor)
-        self.size = self.original_size * Game.scale_factor
-        self.size.x = self.size.y * self.original_size.x / self.original_size.y
-        self.pos = (relcenter * (Game.track_area)) - self.size*0.5
-            
     def draw(self, window):
         self.spr.position = self.pos.toSFML() #sprite position
         #self.spr.origin = (self.spr.texture.width/2, self.spr.texture.height/2) #sprite origin
@@ -90,7 +84,7 @@ def CreateExplosionAt(ent, size, speed, type):
     CreateExplosion(ent.center(), size, speed, type)
 
 def CreateVehicleExplosion(ent):
-    CreateExplosionAt(ent, ent.original_size.len()*2, 1, Game.animations.vehicle_explosion)
+    CreateExplosionAt(ent, ent.size.len()*2, 1, Game.animations.vehicle_explosion)
     Game.sounds.playVehicleExplosion(ent.center())
 
 def CreateVehicleCollision(ent1, ent2):
@@ -111,3 +105,84 @@ def CreateVehicleDustCloud(ent):
         ent.dusttimer = 0.0
     else:
         ent.dusttimer += Game.delta_time
+
+        
+#********************* ACTIONS **************************
+# TimedAction is a effect that executes a single action once after a set period of time.
+# Actions have a draw method, to draw something if needed while they are running.
+# Actions have a __call__ method, executed when they are processed.
+class TimedAction:
+    def __init__(self, lifetime, action):
+        self.destroyed = action == None
+        self.priority = 10
+        self.action = action
+        self.lifetime = lifetime
+        self.elapsed = 0
+            
+    def update(self, dt):
+        self.elapsed += dt
+        if self.elapsed >= self.lifetime and not self.destroyed:
+            self.destroyed = True
+            self.action()
+        self.action.update(dt, self.elapsed / self.lifetime)
+            
+    def draw(self, window):
+        self.action.draw(window)
+            
+### ACTIONS
+class NewEntityAction:
+    color_scheme = {
+        'berserker': (False, sf.Color.YELLOW),  #amarelo
+        'slinger': (False, sf.Color(255, 150, 0, 255)),     #laranja
+        'warrig': (True, sf.Color.RED),   #vermelho piscante
+        'rock': (True, sf.Color(160,82,45, 255)),   #vermelho ou ? piscante
+        'quicksand': (False, sf.Color.BLUE), #azul
+        'powerup': (True, sf.Color.GREEN),  #verde piscante
+    }
+
+    def __init__(self, ent):
+        self.new_ent = ent
+        textSize = 20
+        apX = ent.pos.x + ent.size.x/2
+        apY = 6 if ent.pos.y < Game.track_area.y/2 else Game.track_area.y - textSize - 3
+        self.blinking, self.color = NewEntityAction.color_scheme[ent.type]
+        self.alert = GUIText("!", (apX, apY), GUIText.HOR_CENTER, sf.Color.BLACK, textSize)
+        self.alert.txt.style = sf.Text.BOLD
+        self.alert.outline_color = self.color
+        self.tri = sf.CircleShape(15, 3)
+        self.tri.origin = (self.tri.local_bounds.left + self.tri.local_bounds.width/2,
+                           self.tri.local_bounds.top + self.tri.local_bounds.height/2)
+        self.tri.position = self.alert.txt.global_bounds.center #(apX, apY)
+        if ent.pos.y < Game.track_area.y/2:
+            self.tri.rotation = 180
+            self.tri.position = self.tri.position.x, self.tri.position.y + 2
+        self.fills = [sf.Color(int(self.color.r*0.2),int(self.color.g*0.2),int(self.color.b*0.2),150),
+                      self.color,
+                      sf.Color.WHITE
+                      ]
+        self.tri.outline_thickness = 2
+        self.tri.outline_color = self.color
+        self.blink_state = 0
+        self.blink_elapsed = 0
+        self.blink_durations = [.3, .3, .2]
+        self.tri.fill_color = self.fills[self.blink_state]
+        
+    def __call__(self):
+        #print "Generating entity %s %s at %s" % (type, self.new_ent.ID, self.new_ent.pos)
+        Game.entities.append(self.new_ent)
+        if self.new_ent.type == 'warrig': #special case...
+            Game.entities[-1].createTurrets()
+            
+    def update(self, dt, time_lived):
+        #time_lived is relative: is goes from 0 (just started) to 1 (lifetime ended)
+        c = min(time_lived, 1.0)
+        self.alert.txt.color = sf.Color(255*c, 255*c, 255*c, 255)
+        if self.blinking:
+            self.blink_elapsed += dt
+            if self.blink_elapsed >= self.blink_durations[self.blink_state]:
+                self.blink_state = (self.blink_state + 1) % len(self.fills)
+                self.tri.fill_color = self.fills[self.blink_state]
+            
+    def draw(self, window):
+        window.draw(self.tri)
+        self.alert.draw(window)

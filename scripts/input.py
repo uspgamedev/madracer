@@ -300,7 +300,7 @@ class GamePadInput(InputInterface):
         self.textCursor.fill_color = sf.Color.TRANSPARENT
         self.textCursor.outline_color = sf.Color.BLUE
         self.textCursor.outline_thickness = 2
-        self.textCursor.size = Game.plaNameTxt.txt.character_size*0.6, 1
+        self.textCursor.size = 30*0.6, 1
         
     def updateTargetDir(self, dist):
         d = self.target

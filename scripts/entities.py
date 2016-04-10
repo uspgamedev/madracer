@@ -13,9 +13,7 @@ class BaseCar:
     def __init__(self, type, x, y, w, h, color, speed, hp, points):
         self.type = type
         self.pos = Vector(x,y)
-        self.original_size = Vector(w,h)
-        self.size = self.original_size * Game.scale_factor
-        self.size.x = self.size.y * self.original_size.x / self.original_size.y
+        self.size = Vector(w,h)
         self.color = color
         try:
             self.spr = sf.Sprite(Game.images[type])
@@ -66,14 +64,6 @@ class BaseCar:
             self.curbar.position = (self.pos.x, self.pos.y + self.size.y + 1)
             window.draw(self.curbar)
             
-    def updateGraphics(self, oldfactor):
-        relcenter = self.center() / (Game.original_track_area * oldfactor)
-        self.size = self.original_size * Game.scale_factor
-        self.size.x = self.size.y * self.original_size.x / self.original_size.y
-        self.pos = (relcenter * (Game.track_area)) - self.size*0.5
-        self.maxbar.size = (self.size.x, 5)
-        self.curbar.size = (self.size.x * self.hp/self.max_hp, 5)
-
     def checkCollision(self, ent):
         notIntersects = self.pos.x > (ent.pos.x + ent.size.x)
         notIntersects = notIntersects or (self.pos.x + self.size.x) < ent.pos.x
@@ -119,7 +109,7 @@ class BaseCar:
         s = self.base_speed
         if self.considers_game_speed:
             s = s * Game.speed_level + 5
-        return Game.scale_factor.y * s * (1.0 - self.stuck*0.85) #0.85 is % of speed lost while stuck
+        return s * (1.0 - self.stuck*0.85) #0.85 is % of speed lost while stuck
 
     def move(self, dir):
         self.last_moved_dir = dir.copy()
@@ -387,11 +377,7 @@ class RigTurret(BaseCar):
             projectile.cant_hit.append('warrig')
             Game.entities.append(projectile)
             self.cooldown = 0.0
-
-    def updateGraphics(self, oldfactor):
-        BaseCar.updateGraphics(self, oldfactor)
-        self.yoffset = self.relative_yoffset * self.rig.size.y
-            
+ 
     def collidedWith(self, ent):
         if ent.type == 'player':
             self.hp -= 5
@@ -426,7 +412,6 @@ class Projectile(BaseCar):
         self.show_life_bar = False
         self.cant_hit = ['projectile', 'bomb', 'powerup', 'quicksand']
         s = Game.sounds.playFire(self.center())
-        #s.volume = 50
 
     def update(self, dt):
         self.lifetime -= dt

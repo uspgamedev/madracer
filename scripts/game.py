@@ -158,6 +158,8 @@ class Game:
         self.effects = []
         
         self.input = input.available_inputs[self.input_index]()
+        if not self.input.valid():
+            self.changeInput(False)
         
         self.entCount = 0
         self.cont = True
@@ -195,7 +197,6 @@ class Game:
         self.track.position = (self.track_pos).toSFML()
         
         barWidth = self.track_pos.x
-        txtScale = self.scale_factor.x
         width, height = self.window.view.size
         
         def createBar(x, w, color):
@@ -218,75 +219,64 @@ class Game:
         #text player values: direita, right-align, branco
         self.plaDataTxts = []
         for i in xrange(4):
-            self.plaDataTxts.append(GUIText("-", (width, 25*txtScale + 40*(i)*txtScale), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*txtScale))
+            self.plaDataTxts.append(GUIText("-", (width, 25 + 40*(i)), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
         
         self.fixedHudText = []
         #text commands: direita, left_align, amarelado *
         #text player keys: direita, right-align, branco *
-        ckY = self.plaDataTxts[-1].txt.position.y + 2*18*txtScale#25*txtScale + 40*3*txtScale + 2*18*txtScale #pos a little below the last text
-        self.fixedHudText.append(GUIText(self.input.name, (width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18*txtScale))
-        ckY += 18*txtScale
+        ckY = self.plaDataTxts[-1].txt.position.y + 2*18 #pos a little below the last text
+        self.fixedHudText.append(GUIText(self.input.name, (width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18))
+        ckY += 18
         for cmd, key in self.input.command_list():
-            self.fixedHudText.append(GUIText(cmd, (width-barWidth+6, ckY), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
-            ckY += 18*self.scale_factor.y
-            self.fixedHudText.append(GUIText(key, (width, ckY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
-            ckY += 24*self.scale_factor.y
+            self.fixedHudText.append(GUIText(cmd, (width-barWidth+6, ckY), GUIText.HOR_LEFT, hsCor, 18))
+            ckY += 18
+            self.fixedHudText.append(GUIText(key, (width, ckY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
+            ckY += 24
         
         #text highscore: esquerda, left-align, branco *
-        self.fixedHudText.append(GUIText("Highscores:", (0,20*self.scale_factor.y), GUIText.HOR_LEFT, sf.Color.RED, 18*self.scale_factor.y))
+        self.fixedHudText.append(GUIText("Highscores:", (0,20), GUIText.HOR_LEFT, sf.Color.RED, 18))
         #text HSE points: esquerda, right-align, branco *
-        hsY = 50*self.scale_factor.y
+        hsY = 50
         for i, hse in enumerate(Game.highscores):
             #text HSE names: esquerda, left-align, amarelado *
             hsName = str(i+1)+': '+hse.name
-            self.fixedHudText.append(GUIText(hsName, (0, hsY), GUIText.HOR_LEFT, hsCor, 18*self.scale_factor.y))
-            hsY += 18*self.scale_factor.y
-            self.fixedHudText.append(GUIText("%i"%(hse.points), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
-            hsY += 18*self.scale_factor.y
+            self.fixedHudText.append(GUIText(hsName, (0, hsY), GUIText.HOR_LEFT, hsCor, 18))
+            hsY += 18
+            self.fixedHudText.append(GUIText("%i"%(hse.points), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
+            hsY += 18
             mins = hse.level-1
             secs = mins*60 - int(mins)*60
             mins = int(mins)
-            self.fixedHudText.append(GUIText("%im%is"%(mins,secs), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18*self.scale_factor.y))
-            hsY += 24*self.scale_factor.y
+            self.fixedHudText.append(GUIText("%im%is"%(mins,secs), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
+            hsY += 24
             
         #text player data: direita, left_align, branco *
-        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (width-barWidth+6,5*txtScale), GUIText.HOR_LEFT, hsCor, 18*txtScale))
+        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (width-barWidth+6,5), GUIText.HOR_LEFT, hsCor, 18))
         #text points: esquerda, left-align, branco *
         #self.fixedHudText.append(GUIText("Points:", (0,25), GUIText.HOR_LEFT, hsCor, 18))
 
-        self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
+        self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.pausedTxt.txt.style = sf.Text.BOLD
         self.pausedTxt.outline_color = sf.Color.RED
         
-        self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40*txtScale)
+        self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.gameOverTxt.txt.style = sf.Text.BOLD
         self.gameOverTxt.outline_color = sf.Color.RED
         
         restxt = "Type in highscore name (max 8 chars):\n\n\nPress ENTER to start a new game."
-        self.restartTxt = GUIText(restxt, (width/2, height/2 + 40*txtScale), GUIText.HOR_CENTER, sf.Color.BLACK, 20*txtScale)
+        self.restartTxt = GUIText(restxt, (width/2, height/2 + 40), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
         self.restartTxt.txt.style = sf.Text.BOLD
         self.restartTxt.outline_color = sf.Color.RED
         
-        self.plaNameTxt = GUIText("-", (width/2, height/2 + 70*txtScale), GUIText.HOR_CENTER, sf.Color.BLACK, 30*txtScale)
+        self.plaNameTxt = GUIText("-", (width/2, height/2 + 70), GUIText.HOR_CENTER, sf.Color.BLACK, 30)
         self.plaNameTxt.txt.style = sf.Text.BOLD
         self.plaNameTxt.outline_color = sf.Color.RED
         
     def updateGraphics(self):
         #to be executed when window changes size (ex.: change fullscreen status
-        #oldfactor = self.scale_factor
-        #self.scale_factor = Vector(self.window.width/1000.0, self.window.height/700.0)
-        #self.track_area = self.original_track_area * self.scale_factor
-        #self.track_pos = self.original_track_pos * self.scale_factor
-        
-        #p = self.original_track_pos.x / self.original_track_area.x
-        #self.track_area = Vector(self.window.width * (1-p*2), self.window.height)
-        #self.track_pos = Vector(self.window.width * p, 0)
-        #self.scale_factor = Vector(self.window.width/1000.0, self.window.height/700.0)
-        
         self.track_area = self.original_track_area
         self.track_pos = self.original_track_pos
         self.window.view = sf.View((0,0,1000,700))
-        self.scale_factor = Vector(1,1)
         orisize = Vector(1000,700)
         if not self.stretchView:
             if self.window.width/orisize.x > self.window.height/orisize.y:
@@ -299,11 +289,7 @@ class Game:
                 hh = self.window.width * orisize.y / orisize.x
                 hh = hh / self.window.height
                 self.window.view.viewport = (0.0, (1.0 - hh)/2, 1.0, hh)
-        
-        #for ent in self.entities:
-        #    ent.updateGraphics(oldfactor)
-        #for eff in self.effects:
-        #    eff.updateGraphics(oldfactor)
+
         self.initGraphics()
         
     def getIDfor(self, ent):
@@ -390,16 +376,14 @@ class Game:
                             for type, chance in gen.entities:
                                 if entIndex < chance + cumulative:
                                     X = random.random()*self.track_area.x
-                                    newEnt = self.entityFactory[type](X+self.track_pos.x, 0)
-                                    
+                                    newEnt = Game.entityFactory[type](X+self.track_pos.x, 0)                                        
                                     Y = -newEnt.size.y*0.85
                                     if random.random() < 0.25 and isInArray(type, possibleBottomEntTypes):
-                                        Y = self.track_area.y - newEnt.size.y*0.55
-                                    newEnt.pos.y = Y - self.track_pos.y
-                                    self.entities.append(newEnt)
-                                    if type == 'warrig': #special case...
-                                        self.entities[-1].createTurrets()
-                                    #print "Generating entity "+type
+                                        Y = Game.track_area.y - newEnt.size.y*0.55
+                                    newEnt.pos.x = newEnt.pos.x - newEnt.size.x * 0.5
+                                    newEnt.pos.y = Y - Game.track_pos.y
+                                    alert = TimedAction(3.0, NewEntityAction(newEnt))
+                                    self.effects.append(alert)
                                     break
                                 cumulative += chance
                         gen.time_to_create = (gen.interval[1] - gen.interval[0])*random.random() + gen.interval[0]
@@ -423,6 +407,13 @@ class Game:
                     self.points += ent.point_value
                     self.entities.remove(ent)
             
+            # sort effect by priority
+            def effect_comp(a,b):
+                v = int(b.priority - a.priority) #greater values first
+                if v != 0:
+                    return v / abs(v)
+                return 0
+            self.effects.sort(effect_comp)
             # update each effect
             for eff in list(self.effects):
                 eff.update(dt)
@@ -492,15 +483,14 @@ class Game:
     def pause(self):
         self.paused = not self.paused
         
-    def changeInput(self):
+    def changeInput(self, update_graphics=True):
         while (True):
-            self.input_index += 1
-            if self.input_index >= len(input.available_inputs):
-                self.input_index = 0
+            self.input_index = (self.input_index+1) % len(input.available_inputs)
             self.input = input.available_inputs[self.input_index]()
             if self.input.valid():
                 break
-        self.updateGraphics()
+        if update_graphics:
+            self.updateGraphics()
 
     def appendCharToPlayerName(self, c):
         if len(self.player_name) < 8:
@@ -544,6 +534,7 @@ Game = Game()
 from utils import Vector, GUIText
 from powerup import RandomizePowerUp
 from entities import *
+from effects import TimedAction, NewEntityAction
 import input
 
 Game.build()

@@ -6,7 +6,7 @@ from scripts.game import Game, input
 
 ################################################################
 
-def executeGame(fullscreen, cheatsEnabled, vsync, stretch):
+def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index):
     windowtitle = "Mad Racer"
     if fullscreen:
         windowsize, _ = sf.VideoMode.get_desktop_mode()
@@ -21,6 +21,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch):
         print "error"
         exit(1)
     
+    Game.input_index = input_index
     Game.initialize(window, font, cheatsEnabled, stretch)
     
     icon = Game.images.player.to_image()
@@ -105,5 +106,9 @@ if __name__ == "__main__":
     parser.add_argument("--vsync", "-vs", action="store_true", default=False, help="If VSync should be enabled.")
     parser.add_argument("--stretch", "-s", action="store_true", default=False, help="If true, graphics will be stretched to fit window. If false (default), graphics will "+
         "maintain the original intended aspect-ratio, but might cause black bars on window borders due to unused empty space.")
+    methods = [im.__name__.lower()[:-5] for im in input.available_inputs]
+    parser.add_argument("--input", "-i", choices=methods, default=methods[0], help="Starting input method to use. It can also be changed at anytime in-game." )
     args = parser.parse_args()
-    executeGame(args.fullscreen, args.cheats, args.vsync, args.stretch)
+    
+    input_index = methods.index(args.input)
+    executeGame(args.fullscreen, args.cheats, args.vsync, args.stretch, input_index)

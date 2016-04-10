@@ -101,6 +101,17 @@ class BaseCar:
     def center(self):
         return self.pos + self.size*0.5 #self.pos.add(self.size.scale(0.5))
 
+    def rect(self):
+        return sf.Rectangle(self.pos.toSFML(), self.size.toSFML())
+        
+    def vertices(self):
+        r = self.rect()
+        vl = [ Vector(r.left,    r.top),
+               Vector(r.right,    r.top),
+               Vector(r.left, r.bottom),
+               Vector(r.right, r.bottom)]
+        return vl
+        
     def onDeath(self):
         pass
 
@@ -407,6 +418,7 @@ class RigTurret(BaseCar):
 class Projectile(BaseCar):
     def __init__(self, x, y, dmg, speed, dir, lifetime, color):
         BaseCar.__init__(self, 'projectile', x, y, 7, 7, 'blue', speed, 1, 0)
+        self.pos = self.pos - self.size*0.5
         self.dmg = dmg
         self.dir = dir.copy()
         self.lifetime = lifetime
@@ -470,6 +482,7 @@ class Bomb(BaseCar):
         self.explode()
 
     def explode(self):
+        if self.hp <= 0:    return
         self.hp = -1
         CreateExplosionAt(self, self.blast_radius*2, 1, Game.animations.bomb_explosion)
         Game.sounds.playBombExplosion(self.center())
@@ -543,3 +556,21 @@ class QuickSand(BaseCar):
             powerup.CheckAndDropPowerUp(self.pos, 1)
             CreateVehicleCollision(self, self)
 #end class QuickSand
+
+#*********** Dummy Entity: used as a static target in the map to test stuff ******************
+class Dummy(BaseCar):
+    def __init__(self, x, y):
+        BaseCar.__init__(self, 'dummy', x, y, 60, 60, 'black', 0, 1000, 5)
+        self.considers_game_speed = True
+        self.spr = sf.Sprite(Game.images.rock0)
+
+    def update(self, dt):
+        pass
+
+    def collidedWith(self, ent):
+        if ent.type == 'projectile' or ent.type == 'powerup' or ent.type == 'bomb':
+            ent.collidedWith(self)
+            return
+
+    def onDeath(self):
+        CreateVehicleExplosion(self)

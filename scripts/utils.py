@@ -5,6 +5,8 @@ import sfml as sf
 import random, math
 #from game import Game
 import game
+from collections import namedtuple
+
 
 #*********************************** UTILITIES *********************************
 class Vector:
@@ -34,7 +36,15 @@ class Vector:
             self.y = self.y / l
         
     def copy(self):
-        return Vector(self.x, self.y);
+        return Vector(self.x, self.y)
+        
+    def perpendicular(self):
+        return Vector(self.y, -self.x)
+    
+    def angle(self):
+        return math.atan2(self.y, self.x)
+    def angleBetween(self, v):
+        return v.angle() - self.angle()
     
     def __mul__(self, s):
         if type(s) == type(0) or type(s) == type(0.0):
@@ -50,12 +60,11 @@ class Vector:
             return Vector(self.x/s[0], self.y/s[1])
         else:
             return Vector(self.x / s.x, self.y / s.y)
-            
-            
+                  
     def toSFML(self):
         return sf.Vector2(self.x, self.y)
     def __str__(self):
-        return "("+str(self.x)+", "+str(self.y)+")"
+        return "(%.4fx, %.4fy)" % (self.x, self.y)
     def __repr__(self):
         return self.__str__()
 #end class Vector
@@ -75,7 +84,7 @@ class Turret:
         y = self.ent.pos.y + yoffset + h/2
         angle = 0.0
         if dir != None:
-            angle = math.atan2(dir.y, dir.x) + math.pi/2
+            angle = dir.angle() + math.pi/2
         self.spr.position = (x, y) #sprite position
         self.spr.origin = (self.spr.texture.width/2, self.spr.texture.height/2) #sprite origin
         self.spr.ratio = (w/self.spr.texture.width, h/self.spr.texture.height) #scale factor
@@ -134,6 +143,9 @@ class GUIText:
         self.txt.position = pos if type(pos) == type([]) or type(pos) == type(()) else pos.toSFML()
         self.updateOrigin()
         
+    def char_pos(self, index):
+        return self.txt.find_character_pos(index)
+        
     def draw(self, window):
         color = self.txt.color
         pos = self.txt.position
@@ -148,7 +160,7 @@ class GUIText:
             self.updateOrigin()
         window.draw(self.txt)
 
-def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret']):
+def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
     target = None
     min_dist = game.Game.track_area.squaredLen()
     for i in xrange(1, len(game.Game.entities)):
@@ -164,7 +176,6 @@ def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'ri
 def createPointMark(pos, radius, color):
     circle_res = 16 #in line segments
     mark = sf.VertexArray(sf.PrimitiveType.LINES, 2*(2+circle_res))
-    mark.position = pos
     circle_points = []
     angle_step = 2 * pi / circle_res
     angle = 0.0
@@ -187,3 +198,88 @@ def createPointMark(pos, radius, color):
         mark[circle_res*2 + i].position = cross[i]
         mark[circle_res*2 + i].color = color
     return mark
+    
+def getLineEquation(p1, p2):
+    A = p2.y - p1.y
+    B = p1.x - p2.x
+    C = p2.x * p1.y - p1.x * p2.y
+    def f(p):
+        return A*p.x + B*p.y + C
+    return f
+    
+RaycastEntry = namedtuple("RaycastEntry", "distance entity")
+def raycastQuery(point, dir, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
+    hits = []
+    if dir.x == 0 and dir.y == 0:
+        return hits
+        
+    endPoint = point + dir*game.Game.track_area.len()
+    eq = getLineEquation(point, endPoint)
+    def onWhichSide(p):
+        v = eq(p)
+        if v != 0:
+            return v / abs(v)
+        return 0
+    
+    for i in xrange(len(game.Game.entities)):
+        ent = game.Game.entities[i]
+        if ent.hp <= 0 or not ent.type in validTargets:
+            continue
+        dist = ent.center() - point
+        if abs(dir.angleBetween(dist)) > math.pi/2:
+            continue
+        verts = ent.vertices()
+        sides = [onWhichSide(p) for p in verts]
+        #print "%s %i has sides: [%i,%i,%i,%i] (sum = %s) verts=%s" % (ent.type, ent.ID, sides[0], sides[1], sides[2], sides[3], sum(sides), verts)
+        if abs(sum(sides)) < 4:
+            hits.append( RaycastEntry(dist.len(), ent) )
+            
+    def comp(a,b):
+        v = int(a.distance - b.distance)
+        if v != 0:
+            return v / abs(v)
+        return 0
+    hits.sort(comp)
+            
+    return hits
+    
+def coneQuery(point, dir, angle, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
+    hits = []
+    if dir.x == 0 and dir.y == 0:
+        return hits
+    
+    for i in xrange(len(game.Game.entities)):
+        ent = game.Game.entities[i]
+        if ent.hp <= 0 or not ent.type in validTargets:
+            continue
+        dist = ent.center() - point
+        if abs(dir.angleBetween(dist)) > angle:
+            continue
+        hits.append( RaycastEntry(dist.len(), ent) )
+            
+    def comp(a,b):
+        v = int(a.distance - b.distance)
+        if v != 0:
+            return v / abs(v)
+        return 0
+    hits.sort(comp)
+            
+    return hits
+    
+################################################################
+# Fix for SFML bug
+def intersects(self, rectangle):
+    # make sure the rectangle is a rectangle (to get its right/bottom border)
+    l, t, w, h = rectangle
+    rectangle = Rectangle((l, t), (w, h))
+
+    # compute the intersection boundaries
+    left = max(self.left, rectangle.left)
+    top = max(self.top, rectangle.top)
+    right = min(self.right, rectangle.right)
+    bottom = min(self.bottom, rectangle.bottom)
+
+    # if the intersection is valid (positive non zero area), then
+    # there is an intersection
+    if left < right and top < bottom:
+        return Rectangle((left, top), (right-left, bottom-top))

@@ -342,6 +342,9 @@ class Game:
         for eff in self.effects:
             eff.draw(self.window)
         
+        if self.input.target_dir() != None:
+            self.input.drawPlayerTarget(self.window)
+                
         if self.player.hp <= 0:
             self.gameOverTxt.draw(self.window)
             if self.cheated:
@@ -355,8 +358,6 @@ class Game:
         else:
             if self.paused:
                 self.pausedTxt.draw(self.window)
-            if self.input.target_dir() != None:
-                self.input.drawPlayerTarget(self.window)
         
     ####### UPDATE
     def update(self):
@@ -391,7 +392,7 @@ class Game:
                                     X = random.random()*self.track_area.x
                                     newEnt = self.entityFactory[type](X+self.track_pos.x, 0)
                                     
-                                    Y = -newEnt.size.y
+                                    Y = -newEnt.size.y*0.85
                                     if random.random() < 0.25 and isInArray(type, possibleBottomEntTypes):
                                         Y = self.track_area.y - newEnt.size.y*0.55
                                     newEnt.pos.y = Y - self.track_pos.y
@@ -460,18 +461,9 @@ class Game:
         else:
             if self.player.hp <= 0:
                 if e.code == sf.Keyboard.BACK_SPACE and len(self.player_name) > 0: #backspace
-                    self.player_name.pop()
+                    self.eraseCharFromPlayerName()
                 elif e.code == sf.Keyboard.RETURN: #enter
-                    if len(self.player_name) == 0:   
-                        self.player_name = ['?']*5
-                    hs_index = self.getHSindex()
-                    if hs_index >= 0 and not self.cheated:
-                        self.highscores.pop()
-                        self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.points), self.speed_level) )
-                    self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView)
-                    #save highscores
-                    with open("./highscores", 'wb') as fh:
-                        pickle.dump(self.highscores, fh)
+                    self.startNewGame()
             else:
                 if self.cheats_enabled:
                     if e.code == sf.Keyboard.T:
@@ -485,10 +477,13 @@ class Game:
                         self.entities[-1].createTurrets()
                         self.cheated = True
                     elif e.code == sf.Keyboard.I:
-                        self.entities.append( Rock(random.random()*self.window.width, 0) )
+                        self.entities.append( Rock(random.random()*self.track_area.x, 0) )
                         self.cheated = True
                     elif e.code == sf.Keyboard.O:
-                        self.entities.append( QuickSand(random.random()*self.window.width, 0) )
+                        self.entities.append( QuickSand(random.random()*self.track_area.x, 0) )
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.P:
+                        self.entities.append( Dummy(random.random()*self.track_area.x, random.random()*self.track_area.y) )
                         self.cheated = True
                     elif e.code == sf.Keyboard.G:
                         self.generate_entities = not self.generate_entities
@@ -498,12 +493,44 @@ class Game:
         self.paused = not self.paused
         
     def changeInput(self):
-        self.input_index += 1
-        if self.input_index >= len(input.available_inputs):
-            self.input_index = 0
-        self.input = input.available_inputs[self.input_index]()
+        while (True):
+            self.input_index += 1
+            if self.input_index >= len(input.available_inputs):
+                self.input_index = 0
+            self.input = input.available_inputs[self.input_index]()
+            if self.input.valid():
+                break
         self.updateGraphics()
 
+    def appendCharToPlayerName(self, c):
+        if len(self.player_name) < 8:
+            self.player_name.append( chr(e.unicode) )
+    def changePlayerNameChar(self, i, c):
+        if i < len(self.player_name):
+            self.player_name[i] = c
+        elif i == len(self.player_name) and len(self.player_name) < 8:
+            self.player_name.append(c)
+    def getPlayerNameChar(self, i):
+        if i < len(self.player_name):
+            return self.player_name[i]
+        return ''
+    def eraseCharFromPlayerName(self, index=-1):
+        if len(self.player_name) > 0:
+            if index < 0 or index >= len(self.player_name):
+                index = -1
+            self.player_name.pop(index)
+    def startNewGame(self):
+        if len(self.player_name) == 0:   
+            self.player_name = ['?']*5
+        hs_index = self.getHSindex()
+        if hs_index >= 0 and not self.cheated:
+            self.highscores.pop()
+            self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.points), self.speed_level) )
+        self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView)
+        #save highscores
+        with open("./highscores", 'wb') as fh:
+            pickle.dump(self.highscores, fh)
+            
     def getHSindex(self):
         hs_index = -1
         for i, hse in enumerate(self.highscores):

@@ -95,7 +95,8 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch):
             window.draw(tfps)
 
         window.display() # update the window
-                        
+                       
+    
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Python implementation of Mad Racer game.")

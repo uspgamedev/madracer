@@ -6,7 +6,7 @@ from scripts.game import Game, input
 
 ################################################################
 
-def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index):
+def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot):
     windowtitle = "Mad Racer"
     if fullscreen:
         windowsize, _ = sf.VideoMode.get_desktop_mode()
@@ -22,7 +22,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index):
         exit(1)
     
     Game.input_index = input_index
-    Game.initialize(window, font, cheatsEnabled, stretch)
+    Game.initialize(window, font, cheatsEnabled, stretch, superhot)
     
     icon = Game.images.player.to_image()
     window.icon = icon.pixels
@@ -55,11 +55,12 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index):
                     window.close();
                 else:
                     Game.processInput(event)
-                    Game.input.receiveInputEvent(event)
             if type(event) is sf.TextEvent:
                 Game.processTextInput(event)
             if type(event) in [sf.MouseWheelEvent, sf.MouseButtonEvent, sf.MouseMoveEvent, sf.JoystickMoveEvent, sf.JoystickButtonEvent, sf.JoystickConnectEvent]:
-                Game.input.receiveInputEvent(event)
+                if not Game.console.open:
+                    Game.cont = True
+                    Game.input.receiveInputEvent(event)
         
         for cmd in Game.input.loop_commands:
             if cmd == input.InputInterface.CLOSE:
@@ -108,7 +109,8 @@ if __name__ == "__main__":
         "maintain the original intended aspect-ratio, but might cause black bars on window borders due to unused empty space.")
     methods = [im.__name__.lower()[:-5] for im in input.available_inputs]
     parser.add_argument("--input", "-i", choices=methods, default=methods[0], help="Starting input method to use. It can also be changed at anytime in-game." )
+    parser.add_argument("--superhot", "-sh", action="store_true", default=False, help="If true, SUPER!HOT!")
     args = parser.parse_args()
     
     input_index = methods.index(args.input)
-    executeGame(args.fullscreen, args.cheats, args.vsync, args.stretch, input_index)
+    executeGame(args.fullscreen, args.cheats, args.vsync, args.stretch, input_index, args.superhot)

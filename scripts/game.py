@@ -127,9 +127,8 @@ class Game:
         pass
     def build(self):
         self.input_index = 0
-        self.original_track_pos = Vector(100, 0)
-        self.original_track_area = Vector(800, 700)
-        self.scale_factor = Vector(1.0,1.0)
+        self.track_pos = Vector(100, 0)
+        self.track_area = Vector(800, 700)
         def powerupFactory(x,y):
             return RandomizePowerUp(Vector(x,y), 1.0)
         self.entityFactory = {
@@ -150,23 +149,25 @@ class Game:
             EntityGenerator('allenemies', [10.0, 30.0], [('berserker',0.4), ('slinger',0.4), ('warrig',0.2)], lambda: 2*math.floor(Game.speed_level)),
             EntityGenerator('rigs', [60.0, 60.0], [('warrig',1.0)], lambda: round(Game.speed_level) - 1)
         ]
+        self.console = Console({'game': self})
         
-    def initialize(self, window, font, cheatsEnabled, stretchView):
+    def initialize(self, window, font, cheatsEnabled, stretchView, superhot):
         self.window = window
         self.font = font
         self.entities = []
         self.effects = []
-        
+        self.console.initGraphics()
         self.input = input.available_inputs[self.input_index]()
         if not self.input.valid():
             self.changeInput(False)
+        self.superhot = superhot
         
         self.entCount = 0
         self.cont = True
         self.speed_level = 1.0
         self.points = 0.0
         self.track = sf.Sprite(self.images.track)
-        self.track.texture_rectangle = sf.Rectangle((0, 2100), (self.original_track_area.x, self.original_track_area.y))
+        self.track.position = self.track_pos.x, -2100
         self.delta_time = 1.0/self.fps
         self.actual_fps = self.fps
         self.music = sf.Music.from_file('sounds/music.ogg')
@@ -183,7 +184,7 @@ class Game:
         self.stretchView = stretchView
         self.updateGraphics()
         self.player_name = []
-        self.player = Player(400*self.scale_factor.x, 400*self.scale_factor.y)
+        self.player = Player(400, 400)
         self.entities.append(self.player)
         
         for gen in self.generators:
@@ -193,7 +194,6 @@ class Game:
         self.clock.restart()
         
     def initGraphics(self):
-        #self.track.ratio = self.scale_factor.toSFML()
         self.track.position = (self.track_pos).toSFML()
         
         barWidth = self.track_pos.x
@@ -274,8 +274,6 @@ class Game:
         
     def updateGraphics(self):
         #to be executed when window changes size (ex.: change fullscreen status
-        self.track_area = self.original_track_area
-        self.track_pos = self.original_track_pos
         self.window.view = sf.View((0,0,1000,700))
         orisize = Vector(1000,700)
         if not self.stretchView:
@@ -298,14 +296,16 @@ class Game:
     
     ####### DRAW
     def draw(self):
+        tpy = self.track.position.y
+        if tpy > 0:
+            topHalfY = tpy - self.track.texture.height
+            self.track.position = self.track_pos.x, topHalfY
+            self.window.draw(self.track)
+            self.track.position = self.track_pos.x, tpy
         self.window.draw(self.track)
         
         for bar in self.side_bars:
             self.window.draw(bar)
-            
-        #text point values: esquerda, right-align, branco
-        #self.pointsTxt.set_text( "%i" % round(self.points) )
-        #self.pointsTxt.draw(self.window)
         
         #text player values: direita, right-align, branco
         playerValues = ("%i/%i" % (self.player.shots_available, self.player.max_shots),
@@ -344,13 +344,15 @@ class Game:
         else:
             if self.paused:
                 self.pausedTxt.draw(self.window)
+                
+        self.console.draw(self.window)
         
     ####### UPDATE
     def update(self):
         ### debugging feature to run SUPER!HOT! (frame-per-frame)
-        #if not self.cont: 
-        #    return
-        #self.cont = False
+        if not self.cont and self.superhot: 
+            return
+        self.cont = False
 
         elapsed = self.clock.restart()
         self.actual_fps = 1.0/elapsed.seconds
@@ -361,7 +363,11 @@ class Game:
         self.sounds.update()
         self.input.update(dt)
         
-        if self.player.hp > 0 and not self.paused:
+        if self.player.hp > 0 and not self.paused and not self.console.open:
+            # update game stats
+            self.points += dt #+1 point per second
+            self.speed_level += dt/60.0 #speed_level will increase by 1 each 60 secs
+            
             # generate new entities
             if self.generate_entities:
                 possibleBottomEntTypes = ['berserker', 'slinger']
@@ -420,32 +426,33 @@ class Game:
                 if eff.destroyed:
                     self.effects.remove(eff)
             
-            # update game stats
-            self.points += dt #+1 point per second
-            self.speed_level += dt/60.0 #speed_level will increase by 1 each 60 secs
-            
-            #self.track_y -= self.speed_level + 5
-            ty = self.track.texture_rectangle.top - (self.speed_level + 5)
-            self.track.texture_rectangle = sf.Rectangle((0, ty), (self.original_track_area.x, self.original_track_area.y))
-            if self.track.texture_rectangle.top <= -700:
-                self.track.texture_rectangle = sf.Rectangle((0, 2100), (self.original_track_area.x, self.original_track_area.y))
+            self.track.position = self.track_pos.x, self.track.position.y + (self.speed_level + 5)
+            if self.track.position.y > 700:
+                self.track.position = (self.track_pos.x, -2100)
 
     ####### INPUT
     def processTextInput(self, e):
-        if self.player.hp <= 0:
-            if not e.unicode in [8,13] and len(self.player_name) < 8: # any text char, except newline and backspace
-                try:
-                    self.player_name.append( chr(e.unicode) )
-                except:
-                    print "ERROR: Strange text key entered"
+        self.console.processInput(e)
+        if not self.console.open:
+            if self.player.hp <= 0:
+                if not e.unicode in [8,13] and len(self.player_name) < 8: # any text char, except newline and backspace
+                    try:
+                        self.player_name.append( chr(e.unicode) )
+                    except:
+                        print "ERROR: Strange text key entered"
     def processInput(self, e):
+        if self.cheats_enabled:
+            self.console.processInput(e)
+        if self.console.open:   return
+        self.cont = True
+        self.input.receiveInputEvent(e)
         if not e.released:
             if self.player.hp <= 0: return
             if self.cheats_enabled:
-                if e.code == sf.Keyboard.H:
+                if e.code == sf.Keyboard.H and e.control:
                     self.player.hp = self.player.max_hp
                     self.cheated = True
-                elif e.code == sf.Keyboard.B:
+                elif e.code == sf.Keyboard.B and e.control:
                     self.player.bombs += 1
                     self.cheated = True
             self.cont = True
@@ -457,26 +464,26 @@ class Game:
                     self.startNewGame()
             else:
                 if self.cheats_enabled:
-                    if e.code == sf.Keyboard.T:
+                    if e.code == sf.Keyboard.T and e.control:
                         self.entities.append( Berserker(200, 200) )
                         self.cheated = True
-                    elif e.code == sf.Keyboard.Y:
+                    elif e.code == sf.Keyboard.Y and e.control:
                         self.entities.append( Slinger(600, 200) )
                         self.cheated = True
-                    elif e.code == sf.Keyboard.U:
+                    elif e.code == sf.Keyboard.U and e.control:
                         self.entities.append( WarRig(400, 160) )
                         self.entities[-1].createTurrets()
                         self.cheated = True
-                    elif e.code == sf.Keyboard.I:
-                        self.entities.append( Rock(random.random()*self.track_area.x, 0) )
+                    elif e.code == sf.Keyboard.I and e.control:
+                        self.entities.append( Rock(random.random()*self.track_area.x, -30) )
                         self.cheated = True
-                    elif e.code == sf.Keyboard.O:
-                        self.entities.append( QuickSand(random.random()*self.track_area.x, 0) )
+                    elif e.code == sf.Keyboard.O and e.control:
+                        self.entities.append( QuickSand(random.random()*self.track_area.x, -20) )
                         self.cheated = True
-                    elif e.code == sf.Keyboard.P:
+                    elif e.code == sf.Keyboard.P and e.control:
                         self.entities.append( Dummy(random.random()*self.track_area.x, random.random()*self.track_area.y) )
                         self.cheated = True
-                    elif e.code == sf.Keyboard.G:
+                    elif e.code == sf.Keyboard.G and e.control:
                         self.generate_entities = not self.generate_entities
                         self.cheated = True
                     
@@ -516,7 +523,7 @@ class Game:
         if hs_index >= 0 and not self.cheated:
             self.highscores.pop()
             self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.points), self.speed_level) )
-        self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView)
+        self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView, self.superhot)
         #save highscores
         with open("./highscores", 'wb') as fh:
             pickle.dump(self.highscores, fh)
@@ -531,7 +538,7 @@ class Game:
 
 Game = Game()
 
-from utils import Vector, GUIText
+from utils import Vector, GUIText, Console
 from powerup import RandomizePowerUp
 from entities import *
 from effects import TimedAction, NewEntityAction

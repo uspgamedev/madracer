@@ -43,14 +43,12 @@ class Explosion:
             #self.spr.texture_rectangle = sf.Rectangle((int(sx), int(sy)), (1024/8, 384/3)) #pos, siz
         self.elapsed += dt
         
-        if self.limitInRect(Game.track_pos, Game.track_area) or self.frame_index >= self.type.num_frames:
+        if self.frame_index >= self.type.num_frames:# or self.limitInRect(Game.track_pos, Game.track_area):
             self.destroyed = True
 
     def draw(self, window):
         self.spr.position = self.pos.toSFML() #sprite position
-        #self.spr.origin = (self.spr.texture.width/2, self.spr.texture.height/2) #sprite origin
         self.spr.ratio = (self.size.x/self.sw, self.size.y/self.sh) #scale factor
-        #self.spr.rotation = math.degrees(angle) #rotation angle (in degrees?)
         window.draw(self.spr)
 
     def limitInRect(self, pos, size):
@@ -75,7 +73,7 @@ class Explosion:
 
     def speed(self):
         s = self.base_speed * Game.speed_level + 5
-        return Game.scale_factor.y * s
+        return s
 #end class Explosion
 def CreateExplosion(pos, size, speed, type):
     Game.effects.append( Explosion(pos, size, speed, type) )

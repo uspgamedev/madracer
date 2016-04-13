@@ -9,14 +9,14 @@ from utils import Vector
 from game import Game
 
 #*********** PowerUp ******************
-class PowerUp(BaseCar):
+class PowerUp(BaseEntity):
     def __init__(self, x, y, action):
-        BaseCar.__init__(self, 'powerup', x, y, 30, 30, 'green', 0.0, 1, 0)
+        BaseEntity.__init__(self, 'powerup', x, y, 30, 30, 'green', 5.0, 1, 0)
         self.dir = Vector(0, 1)
         self.show_life_bar = False
         self.was_picked_up = False
         self.onPickup = action
-        self.considers_game_speed = True
+        #self.considers_game_speed = True
 
     def update(self, dt):
         if self.move(self.dir):

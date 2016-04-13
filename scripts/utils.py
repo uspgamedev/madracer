@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sfml as sf
-import random, math
+import random, math, code, traceback, sys
 #from game import Game
 import game
 from collections import namedtuple
@@ -100,6 +100,7 @@ class GUIText:
     HOR_RIGHT = 1
     HOR_CENTER = 2
     CENTER = 3
+    HOR_LEFT_VER_CENTER = 4
     def __init__(self, txt, pos, align=HOR_LEFT, color=sf.Color.BLACK, size=20):
         self.txt = sf.Text(txt, game.Game.font, character_size=size)
         self.txt.color = color
@@ -122,6 +123,8 @@ class GUIText:
             self.txt.origin = (bounds.left + bounds.width/2, bounds.top)
         elif self.align == GUIText.CENTER:
             self.txt.origin = (bounds.left + bounds.width/2, bounds.top + bounds.height/2)
+        elif self.align == GUIText.HOR_LEFT_VER_CENTER:
+            self.txt.origin = (bounds.left, bounds.top + bounds.height/2)
         
     def text(self):
         return self.txt.string
@@ -265,6 +268,206 @@ def coneQuery(point, dir, angle, validTargets = ['berserker', 'slinger', 'warrig
     hits.sort(comp)
             
     return hits
+
+def getTextSize(s, char_size, is_bold=False):
+    size = 0
+    for i, c in enumerate(s):
+        code = ord(c)
+        size += game.Game.font.get_glyph(code, char_size, is_bold).advance
+        if i > 0:
+            size += game.Game.font.get_kerning(ord(s[i-1]), code, char_size)
+    return size
+    
+def wrapText2(width, s, char_size, is_bold=False, lineBreakers=[' ', '\t']):
+    size = 0
+    wrapped = []
+    line_start = 0
+    last_whitespace_index = 0
+    for i, c in enumerate(s):
+        code = ord(c)
+        if c in lineBreakers:
+            last_whitespace_index = i
+        size += Game.font.get_glyph(code, char_size, is_bold).advance
+        if i > 0:
+            size += Game.font.get_kerning(ord(s[i-1]), code, char_size)
+        if size > width and last_whitespace_index > 0:
+            wrapped.append( s )
+            
+    return wrapped
+
+def wrapText(width, s, char_size, is_bold=False):
+    parts = s.split(" ")
+    wrapped = []
+    size = 0
+    line = []
+    for sub_s in parts:
+        w = getTextSize(sub_s+" ", char_size, is_bold)
+        size += w
+        if size > width:
+            wrapped.append( " ".join(line) )
+            size = w
+            line = []
+        line.append(sub_s)
+    if len(line) > 0:
+        wrapped.append( " ".join(line) )
+    return wrapped    
+ 
+################################################################
+# Console
+class Console(code.InteractiveConsole):
+    def __init__(self, locals={}):
+        code.InteractiveConsole.__init__(self, dict(globals().items() + locals.items()), "__console__")
+        self.open = False
+        self.initialized = False
+        self.outputs = []
+        self.output_index = 0
+        self.log = []
+        self.log_index = 0
+        self.line = ""
+        self.line_index = 0
+        self.stdout = sys.stdout
+        
+    def initGraphics(self):
+        if self.initialized:    return
+        self.initialized = True
+        self.output_area = sf.RectangleShape((800, 700/2))
+        self.output_area.position = (100, 3)
+        self.output_area.fill_color = sf.Color(0,0,0,180)
+        self.output_area.outline_thickness = 3
+        self.output_area.outline_color = sf.Color.GREEN
+        self.input_area = sf.RectangleShape((800, 33))
+        self.input_area.position = 100, self.output_area.global_bounds.bottom
+        self.input_area.fill_color = sf.Color(0,0,0,180)
+        self.input_area.outline_thickness = 3
+        self.input_area.outline_color = sf.Color.BLUE
+        self.input = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+8), GUIText.HOR_LEFT, sf.Color.WHITE, 20)
+        self.cursor = sf.RectangleShape((2, 20))
+        self.cursor.fill_color = sf.Color.WHITE
+        self.cursor.position = self.input.position()
+        self.num_outputs = int( (self.output_area.local_bounds.height - 16) / 12 )
+        
+    def processInput(self, e):
+        if type(e) == sf.TextEvent and self.open:
+            # So ENTER(13)/BACKSPACE(8)/TAB(9) aparentemente podem vir aqui.
+            if e.unicode == 13: #ENTER
+                if len(self.line) > 0:
+                    self.log.insert(0, self.line)
+                    try:
+                        self.addOutput("$ "+self.line, sf.Color(180,180,255,255))
+                        incomplete = self.push(self.line)
+                    except:
+                        traceback.print_exc(file=sys.stderr)
+                    self.line = ""
+                    self.line_index = 0
+                    self.log_index = 0
+            elif e.unicode == 8: #BACKSPACE
+                if len(self.line) > 0:
+                    self.line = self.line[:self.line_index-1] + self.line[self.line_index:]
+                    self.line_index -= 1
+                    if self.line_index < 0:
+                        self.line_index = 0
+            else:
+                try:
+                    c = str(chr(e.unicode))
+                    c = c.encode("ascii", "ignore")
+                    self.line = self.line[:self.line_index] + c + self.line[self.line_index:]
+                    self.line_index += 1
+                except:
+                    traceback.print_exc(file=sys.stderr)
+        elif type(e) == sf.KeyEvent:
+            if e.code == sf.Keyboard.TAB and e.control and e.released:
+                self.open = not self.open
+            elif self.open and e.released:
+                if e.code == sf.Keyboard.LEFT:
+                    self.line_index -= 1
+                    if self.line_index < 0:
+                        self.line_index = 0
+                elif e.code == sf.Keyboard.RIGHT:
+                    self.line_index += 1
+                    if self.line_index > len(self.line):
+                        self.line_index = len(self.line)
+                elif e.code == sf.Keyboard.UP:
+                    self.log_index += 1
+                    li = self.log_index - 1
+                    if 0 <= li < len(self.log):
+                        self.line = self.log[li]
+                        self.line_index = len(self.line)
+                    elif li >= len(self.log):
+                        self.log_index = len(self.log)
+                        self.line = self.log[self.log_index-1]
+                elif e.code == sf.Keyboard.DOWN:
+                    self.log_index -= 1
+                    li = self.log_index - 1
+                    if 0 <= li < len(self.log):
+                        self.line = self.log[li]
+                        self.line_index = len(self.line)
+                    elif li < 0:
+                        self.log_index = 0
+                        self.line = ""
+                elif e.code == sf.Keyboard.DELETE:
+                    if len(self.line) > 0:
+                        self.line = self.line[:self.line_index] + self.line[self.line_index+1:]
+                elif e.code == sf.Keyboard.HOME:
+                    self.line_index = 0
+                elif e.code == sf.Keyboard.END:
+                    self.line_index = len(self.line)
+            elif self.open and e.code == sf.Keyboard.PAGE_UP:
+                self.output_index -= 1
+                if self.output_index < 0:
+                    self.output_index = 0
+            elif self.open and e.code == sf.Keyboard.PAGE_DOWN:
+                self.output_index += 1
+                if self.output_index > len(self.outputs) - self.num_outputs:
+                    self.output_index -= 1
+    
+    def push(self, line):
+        ### OVERWRITING InteractiveConsole.push to print stuff to graphical console
+        sys.stdout = self
+        code.InteractiveConsole.push(self, line)
+        sys.stdout = self.stdout
+        
+    def write(self, data):
+        ### OVERWRITING InteractiveConsole.write to print to graphical console
+        try:
+            s = str(data)
+            if data[-1] == "\n":
+                s = str(data[:-1])
+            s = str(s.encode("ascii", "ignore"))
+            if len(s) <= 0: return
+            self.addOutput(s, sf.Color.WHITE)
+        except:
+            traceback.print_exc(file=sys.stderr)
+    
+    def addOutput(self, out, color=sf.Color.WHITE):
+        out = str(out.encode("ascii", "ignore"))
+        
+        wraps = wrapText(self.output_area.local_bounds.width - 5, out, 12)
+        for s in wraps:
+            txt = sf.Text()
+            txt = sf.Text(s, game.Game.font, character_size=12)
+            txt.color = color
+            self.outputs.append(txt)
+            if len(self.outputs) - self.output_index > self.num_outputs:
+                self.output_index += 1
+            
+    def drawOutputs(self, window):
+        oY = 8
+        for i in xrange(self.output_index, self.num_outputs+self.output_index):
+            if i >= len(self.outputs):  break
+            txt = self.outputs[i]
+            txt.position = (100, oY)
+            window.draw(txt)
+            oY += 12
+        
+    def draw(self, window):
+        if not self.open:   return
+        window.draw(self.output_area)
+        window.draw(self.input_area)
+        self.drawOutputs(window)
+        self.input.set_text(self.line)
+        self.input.draw(window)
+        self.cursor.position = self.input.char_pos(self.line_index).x, self.input.position().y
+        window.draw(self.cursor)
     
 ################################################################
 # Fix for SFML bug

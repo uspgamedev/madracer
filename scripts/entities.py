@@ -9,7 +9,7 @@ from effects import CreateVehicleDustCloud, CreateVehicleCollision, CreateVehicl
 import powerup
 
 #******************************** ENTITIES ************************************
-class BaseCar:
+class BaseEntity:
     def __init__(self, type, x, y, w, h, color, speed, hp, points):
         self.type = type
         self.pos = Vector(x,y)
@@ -108,19 +108,19 @@ class BaseCar:
     def speed(self):
         s = self.base_speed
         if self.considers_game_speed:
-            s = s * Game.speed_level + 5
+            s = s * (Game.speed_level + 5)
         return s * (1.0 - self.stuck*0.85) #0.85 is % of speed lost while stuck
 
     def move(self, dir):
         self.last_moved_dir = dir.copy()
-        self.pos = self.pos + dir*self.speed() #self.pos.add(dir.scale(self.speed()))
+        self.pos = self.pos + dir*self.speed()
         return self.limitInRect(Game.track_pos, Game.track_area)
 #end class BaseCar
 
 #************* Player ****************
-class Player(BaseCar):
+class Player(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'player', x, y, 32, 60, 'black', 4, 150, 0)
+        BaseEntity.__init__(self, 'player', x, y, 32, 60, 'black', 4, 150, 0)
         self.bombs = 3
         self.max_shots = 25
         self.shots_available = self.max_shots
@@ -133,8 +133,8 @@ class Player(BaseCar):
         self.turret = Turret(self)
 
     def draw(self, window):
-        BaseCar.drawEntity(self, window)
-        BaseCar.drawHPBar(self, window)
+        BaseEntity.drawEntity(self, window)
+        BaseEntity.drawHPBar(self, window)
         dir = Game.input.target_dir()
         self.turret.draw(window, dir)
 
@@ -184,9 +184,9 @@ class Player(BaseCar):
 #end class Player
 
 #*********** Berserker ******************
-class Berserker(BaseCar):
+class Berserker(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'berserker', x, y, 32, 60, 'red', 3.5, 25, 200)
+        BaseEntity.__init__(self, 'berserker', x, y, 32, 60, 'red', 3.5, 25, 200)
         self.isChasing = True
         self.moveAwayElapsed = 0.0
 
@@ -224,9 +224,9 @@ class Berserker(BaseCar):
 #end class Berserker
 
 #*********** Slinger ********************
-class Slinger(BaseCar):
+class Slinger(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'slinger', x, y, 32, 60, 'purple', 2, 25, 200)
+        BaseEntity.__init__(self, 'slinger', x, y, 32, 60, 'purple', 2, 25, 200)
         self.time_to_shoot = 0.7
         self.cooldown = 0.0
         self.range = random.random()*200 + 100 #range in [100, 300]
@@ -256,8 +256,8 @@ class Slinger(BaseCar):
             self.cooldown = 0.0
 
     def draw(self, window):
-        BaseCar.drawEntity(self, window)
-        BaseCar.drawHPBar(self, window)
+        BaseEntity.drawEntity(self, window)
+        BaseEntity.drawHPBar(self, window)
         dir = Game.player.center() - self.center()
         dir.normalize()
         self.turret.draw(window, dir)
@@ -287,9 +287,9 @@ class Slinger(BaseCar):
 #end class Slinger
 
 #*********** WarRig *********************
-class WarRig(BaseCar):
+class WarRig(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'warrig', x, y, 40, 160, 'yellow', 1, 300, 1000)
+        BaseEntity.__init__(self, 'warrig', x, y, 40, 160, 'yellow', 1, 300, 1000)
         self.time_to_shoot = 1.0
         self.cooldown = 0.0
 
@@ -343,11 +343,11 @@ class WarRig(BaseCar):
 #end class WarRig
 
 #*********** RigTurret ******************
-class RigTurret(BaseCar):
+class RigTurret(BaseEntity):
     def __init__(self, rig, relative_yoffset):
         self.relative_yoffset = relative_yoffset
         self.yoffset = self.relative_yoffset * rig.size.y
-        BaseCar.__init__(self, 'rigturret', rig.pos.x, rig.pos.y+self.yoffset, 40, 40, '#808000', 0, 40, 100)
+        BaseEntity.__init__(self, 'rigturret', rig.pos.x, rig.pos.y+self.yoffset, 40, 40, '#808000', 0, 40, 100)
         self.time_to_shoot = 0.5
         self.cooldown = 0.0
         self.show_life_bar = False
@@ -401,9 +401,9 @@ class RigTurret(BaseCar):
 #end class RigTurret
 
 #/*********** Projectile *****************
-class Projectile(BaseCar):
+class Projectile(BaseEntity):
     def __init__(self, x, y, dmg, speed, dir, lifetime, color):
-        BaseCar.__init__(self, 'projectile', x, y, 7, 7, 'blue', speed, 1, 0)
+        BaseEntity.__init__(self, 'projectile', x, y, 7, 7, 'blue', speed, 1, 0)
         self.pos = self.pos - self.size*0.5
         self.dmg = dmg
         self.dir = dir.copy()
@@ -433,9 +433,9 @@ class Projectile(BaseCar):
 #end class Projectile
 
 #*********** Bomb ************************
-class Bomb(BaseCar):
+class Bomb(BaseEntity):
     def __init__(self, x, y, dir, speed, dmg, radius):
-        BaseCar.__init__(self, 'bomb', x, y, 30, 30, 'purple', speed, 1, 0)
+        BaseEntity.__init__(self, 'bomb', x, y, 30, 30, 'purple', speed, 1, 0)
         self.dmg = dmg
         self.blast_radius = radius
         self.dir = dir
@@ -484,9 +484,9 @@ class Bomb(BaseCar):
 #end class Bomb
 
 #*********** Rock ******************
-class Rock(BaseCar):
+class Rock(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'rock', x, y, 60, 60, 'black', 1, 1000, 5)
+        BaseEntity.__init__(self, 'rock', x, y, 60, 60, 'black', 1, 1000, 5)
         self.dir = Vector(0, 1)
         self.show_life_bar = False
         self.considers_game_speed = True
@@ -515,9 +515,9 @@ class Rock(BaseCar):
 #end class Rock
 
 #*********** QuickSand ******************
-class QuickSand(BaseCar):
+class QuickSand(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'quicksand', x, y, 40, 40, '#906000', 1, 1000, 5)
+        BaseEntity.__init__(self, 'quicksand', x, y, 40, 40, '#906000', 1, 1000, 5)
         self.dir = Vector(0, 1)
         self.show_life_bar = False
         self.considers_game_speed = True
@@ -543,10 +543,9 @@ class QuickSand(BaseCar):
 #end class QuickSand
 
 #*********** Dummy Entity: used as a static target in the map to test stuff ******************
-class Dummy(BaseCar):
+class Dummy(BaseEntity):
     def __init__(self, x, y):
-        BaseCar.__init__(self, 'dummy', x, y, 60, 60, 'black', 0, 1000, 5)
-        self.considers_game_speed = True
+        BaseEntity.__init__(self, 'dummy', x, y, 60, 60, 'black', 0, 1000, 5)
         self.spr = sf.Sprite(Game.images.rock0)
 
     def update(self, dt):
@@ -559,3 +558,4 @@ class Dummy(BaseCar):
 
     def onDeath(self):
         CreateVehicleExplosion(self)
+        powerup.CheckAndDropPowerUp(self.pos, 1)

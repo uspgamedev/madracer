@@ -59,7 +59,6 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
                 Game.processTextInput(event)
             if type(event) in [sf.MouseWheelEvent, sf.MouseButtonEvent, sf.MouseMoveEvent, sf.JoystickMoveEvent, sf.JoystickButtonEvent, sf.JoystickConnectEvent]:
                 if not Game.console.open:
-                    Game.cont = True
                     Game.input.receiveInputEvent(event)
         
         for cmd in Game.input.loop_commands:

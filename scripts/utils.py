@@ -94,7 +94,7 @@ class Turret:
 def isInArray(value, array):
     return value in array
 
-class GUIText:
+class GUIText(object):
     #perhaps implement this inheriting from sf.Text instead of encapsulating it?
     HOR_LEFT = 0
     HOR_RIGHT = 1
@@ -110,8 +110,32 @@ class GUIText:
             self.txt.position = pos.toSFML()
         self.align = align
         self.updateOrigin()
-        self.outline_color = None
-        self.outline_thickness = 1
+        self._outline_color = None
+        self._outline_thickness = 0
+        
+        self.outline_shader = None#sf.Shader.from_file(fragment="scripts/outline.frag")
+        #self.outline_shader.set_currenttexturetype_parameter("texture")
+        #self.outline_shader.set_2float_parameter("stepSize", 0.0, 0.0)
+        
+    @property
+    def outline_color(self):
+        return self._outline_color
+        
+    @outline_color.setter
+    def outline_color(self, c):
+        self._outline_color = c
+        #self.outline_shader.set_color_parameter("outlineColor", c)
+        
+    @property
+    def outline_thickness(self):
+        return self._outline_thickness
+        
+    @outline_thickness.setter
+    def outline_thickness(self, size):
+        self._outline_thickness = size
+        #stepSizeX = self._outline_thickness/self.txt.local_bounds.width if self.txt.local_bounds.width > 0 else 0
+        #stepSizeY = self._outline_thickness/self.txt.local_bounds.height if self.txt.local_bounds.height > 0 else 0
+        #self.outline_shader.set_2float_parameter("stepSize", stepSizeX, stepSizeY)
         
     def updateOrigin(self):
         bounds = self.txt.local_bounds
@@ -135,6 +159,9 @@ class GUIText:
             self.txt.string = "<ERROR>"
             print "ERROR: Cant display string '%s'" % (s)
         self.updateOrigin()
+        #stepSizeX = self._outline_thickness/self.txt.local_bounds.width if self.txt.local_bounds.width > 0 else 0
+        #stepSizeY = self._outline_thickness/self.txt.local_bounds.height if self.txt.local_bounds.height > 0 else 0
+        #self.outline_shader.set_2float_parameter("stepSize", stepSizeX, stepSizeY)
         
     def set_align(self, a):
         self.align = a
@@ -161,7 +188,7 @@ class GUIText:
             self.txt.color = color
             self.txt.position = pos
             self.updateOrigin()
-        window.draw(self.txt)
+        window.draw(self.txt, sf.RenderStates(shader=self.outline_shader))
 
 def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
     target = None

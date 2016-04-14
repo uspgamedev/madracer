@@ -31,9 +31,15 @@ class BaseEntity:
         
         self.maxbar = sf.RectangleShape((self.size.x, 5))
         self.maxbar.fill_color = sf.Color.BLACK
-        
         self.curbar = sf.RectangleShape((self.size.x * self.hp/self.max_hp, 5))
         self.curbar.fill_color = sf.Color.RED
+        
+        self.shaders = [None]
+        #if self.spr != None:
+        #    self.shaders[0] = sf.Shader.from_file(fragment="scripts/outline.frag")
+        #    self.shaders[0].set_currenttexturetype_parameter("texture")
+        #    self.shaders[0].set_2float_parameter("stepSize", 5.0/self.spr.texture.width, 5.0/self.spr.texture.height)
+        #    self.shaders[0].set_color_parameter("outlineColor", sf.Color.GREEN)
 
     def draw(self, window):
         self.drawEntity(window)
@@ -50,7 +56,8 @@ class BaseEntity:
         self.spr.origin = (self.spr.texture.width/2, self.spr.texture.height/2) #sprite origin
         self.spr.ratio = (w/self.spr.texture.width, h/self.spr.texture.height) #scale factor
         self.spr.rotation = math.degrees(angle) #rotation angle (in degrees?)
-        window.draw(self.spr)
+        for shade in self.shaders:
+            window.draw(self.spr, sf.RenderStates(shader=shade))
         
     def drawHPBar(self, window):
         if self.show_life_bar:
@@ -131,7 +138,7 @@ class Player(BaseEntity):
         self.shot_dmg = 20
         self.shot_speed = 15
         self.turret = Turret(self)
-
+        
     def draw(self, window):
         BaseEntity.drawEntity(self, window)
         BaseEntity.drawHPBar(self, window)

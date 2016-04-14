@@ -258,19 +258,23 @@ class Game:
         self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.pausedTxt.txt.style = sf.Text.BOLD
         self.pausedTxt.outline_color = sf.Color.RED
+        self.pausedTxt.outline_thickness = 1
         
         self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.gameOverTxt.txt.style = sf.Text.BOLD
         self.gameOverTxt.outline_color = sf.Color.RED
+        self.gameOverTxt.outline_thickness = 1
         
         restxt = "Type in highscore name (max 8 chars):\n\n\nPress ENTER to start a new game."
         self.restartTxt = GUIText(restxt, (width/2, height/2 + 40), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
         self.restartTxt.txt.style = sf.Text.BOLD
         self.restartTxt.outline_color = sf.Color.RED
+        self.restartTxt.outline_thickness = 1
         
         self.plaNameTxt = GUIText("-", (width/2, height/2 + 70), GUIText.HOR_CENTER, sf.Color.BLACK, 30)
         self.plaNameTxt.txt.style = sf.Text.BOLD
         self.plaNameTxt.outline_color = sf.Color.RED
+        self.plaNameTxt.outline_thickness = 1
         
     def updateGraphics(self):
         #to be executed when window changes size (ex.: change fullscreen status

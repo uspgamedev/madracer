@@ -127,7 +127,7 @@ class BaseEntity:
 #************* Player ****************
 class Player(BaseEntity):
     def __init__(self, x, y):
-        BaseEntity.__init__(self, 'player', x, y, 32, 60, 'black', 4, 150, 0)
+        BaseEntity.__init__(self, 'player', x, y, 32, 60, sf.Color.GREEN, 4, 150, 0)
         self.bombs = 3
         self.max_shots = 25
         self.shots_available = self.max_shots
@@ -137,6 +137,7 @@ class Player(BaseEntity):
         self.reload_elapsed = 0.0
         self.shot_dmg = 20
         self.shot_speed = 15
+        self.points = 0
         self.turret = Turret(self)
         
     def draw(self, window):

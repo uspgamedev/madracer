@@ -190,6 +190,73 @@ class GUIText(object):
             self.updateOrigin()
         window.draw(self.txt, sf.RenderStates(shader=self.outline_shader))
 
+class PlayerHUD(sf.Drawable):
+    RIGHT = 0
+    LEFT = 1
+    def __init__(self, player, pos, align=RIGHT):
+        sf.Drawable.__init__(self)
+        self.player = player
+        if type(pos) == type(()) or type(pos) == type([]):
+            pos = Vector(pos[0], pos[1])
+        self._pos = pos
+        self.align = align
+        self.icons = []
+        self.texts = []
+        char_size = 18.0
+        self.icons.append(sf.Sprite(game.Game.images.ammo))
+        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.icons.append(sf.Sprite(game.Game.images.bomb))
+        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.icons.append(sf.Sprite(game.Game.images.speed))
+        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.icons.append(sf.Sprite(game.Game.images.points))
+        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        yoff = 0
+        for icon, text in zip(self.icons, self.texts):
+            text.color = sf.Color.WHITE
+            icon.ratio = (char_size*2/icon.texture.width, char_size*2/icon.texture.height)
+            if self.align == PlayerHUD.LEFT:
+                icon.position = (pos.x, pos.y + yoff)
+                text.position = (icon.global_bounds.right + 3, icon.global_bounds.top + char_size/2)
+            else:
+                icon.position = (pos.x - icon.global_bounds.width, pos.y + yoff)
+                text.origin = (text.global_bounds.left + text.global_bounds.width, text.global_bounds.top)
+                text.position = (icon.global_bounds.left - 3, icon.global_bounds.top + char_size/2)
+            yoff += icon.global_bounds.height + 5
+
+        self.outline = sf.Shader.from_file(fragment="scripts/outline.frag")
+        self.outline.set_currenttexturetype_parameter("texture")
+        self.outline.set_2float_parameter("stepSize", 3.0/game.Game.images.speed.width, 3.0/game.Game.images.speed.height)
+        self.outline.set_color_parameter("outlineColor", player.color)
+        
+    @property
+    def position(self):
+        return self._pos
+    @position.setter
+    def position(self, p):
+        for icon, text in zip(self.icons, self.texts):
+            icon.position = (p.x, p.y + icon.position.y - self._pos.y)
+            text.position = (icon.global_bounds.right + 3, icon.global_bounds.top + char_size/2)
+        self._pos = p
+        
+    def update(self, dt):
+        mins, secs = game.Game.getTimeFromSpeedLevel(game.Game.speed_level)
+        playerValues = ("%i/%i" % (self.player.shots_available, self.player.max_shots),
+                        "%i" % self.player.bombs,
+                        "%im%is" % (mins, secs),
+                        "%i" % round(self.player.points))
+        
+        for icon, text, value in zip(self.icons, self.texts, playerValues):
+            text.string = value
+            #text.origin = (text.global_bounds.left + text.global_bounds.width, text.global_bounds.top)
+            text.position = (icon.global_bounds.left - 3 - text.global_bounds.width, text.position.y)
+        
+    def draw(self, target, states):
+        staout = sf.RenderStates(shader=self.outline)
+        for icon, text in zip(self.icons, self.texts):
+            target.draw(icon, staout)
+            target.draw(text)
+        
 def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
     target = None
     min_dist = game.Game.track_area.squaredLen()

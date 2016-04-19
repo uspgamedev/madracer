@@ -42,6 +42,9 @@ class TextureManager:
         self.rigturret = sf.Texture.from_file("images/rigturret.png")
         self.track = sf.Texture.from_file("images/track.png")
         self.track.repeated = True
+        self.ammo = sf.Texture.from_file("images/ammo.png")
+        self.points = sf.Texture.from_file("images/points.png")
+        self.speed = sf.Texture.from_file("images/speed.png")
     def __getitem__(self, k):
         return self.__dict__[k]
 
@@ -165,7 +168,6 @@ class Game:
         self.entCount = 0
         self.cont = True
         self.speed_level = 1.0
-        self.points = 0.0
         self.track = sf.Sprite(self.images.track)
         self.track.position = self.track_pos.x, -2100
         self.delta_time = 1.0/self.fps
@@ -182,9 +184,9 @@ class Game:
         self.generate_entities = True
         
         self.stretchView = stretchView
+        self.player = Player(400, 400)
         self.updateGraphics()
         self.player_name = []
-        self.player = Player(400, 400)
         self.entities.append(self.player)
         
         for gen in self.generators:
@@ -194,7 +196,6 @@ class Game:
         self.clock.restart()
         
     def initGraphics(self):
-        self.track.position = (self.track_pos).toSFML()
         
         barWidth = self.track_pos.x
         width, height = self.window.view.size
@@ -214,17 +215,13 @@ class Game:
         
         hsCor = sf.graphics.Color(160,160,0,255)
         
-        #text point values: esquerda, right-align, branco
-        #self.pointsTxt = GUIText("-", (100-6, 45), GUIText.HOR_RIGHT, sf.Color.WHITE, 18)
         #text player values: direita, right-align, branco
-        self.plaDataTxts = []
-        for i in xrange(4):
-            self.plaDataTxts.append(GUIText("-", (width, 25 + 40*(i)), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
+        self.plaData = PlayerHUD(self.player, (width, 5))
         
         self.fixedHudText = []
         #text commands: direita, left_align, amarelado *
         #text player keys: direita, right-align, branco *
-        ckY = self.plaDataTxts[-1].txt.position.y + 2*18 #pos a little below the last text
+        ckY = 145 + 2*18 #pos a little below the last text
         self.fixedHudText.append(GUIText(self.input.name, (width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18))
         ckY += 18
         for cmd, key in self.input.command_list():
@@ -244,17 +241,10 @@ class Game:
             hsY += 18
             self.fixedHudText.append(GUIText("%i"%(hse.points), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
             hsY += 18
-            mins = hse.level-1
-            secs = mins*60 - int(mins)*60
-            mins = int(mins)
+            mins, secs = self.getTimeFromSpeedLevel(hse.level)
             self.fixedHudText.append(GUIText("%im%is"%(mins,secs), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
             hsY += 24
             
-        #text player data: direita, left_align, branco *
-        self.fixedHudText.append(GUIText("Shots:\n\nBombs:\n\nSpeed:\n\nPoints", (width-barWidth+6,5), GUIText.HOR_LEFT, hsCor, 18))
-        #text points: esquerda, left-align, branco *
-        #self.fixedHudText.append(GUIText("Points:", (0,25), GUIText.HOR_LEFT, hsCor, 18))
-
         self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.pausedTxt.txt.style = sf.Text.BOLD
         self.pausedTxt.outline_color = sf.Color.RED
@@ -298,6 +288,12 @@ class Game:
         self.entCount += 1
         return self.entCount
     
+    def getTimeFromSpeedLevel(self, speedLvl):
+        mins = speedLvl - 1
+        secs = mins*60 - int(mins)*60
+        mins = int(mins)
+        return mins, secs
+    
     ####### DRAW
     def draw(self):
         tpy = self.track.position.y
@@ -311,14 +307,7 @@ class Game:
         for bar in self.side_bars:
             self.window.draw(bar)
         
-        #text player values: direita, right-align, branco
-        playerValues = ("%i/%i" % (self.player.shots_available, self.player.max_shots),
-                        "%i" % self.player.bombs,
-                        "%.2f%%" % (self.speed_level*100),
-                        "%i" % round(self.points))
-        for txt, s in zip(self.plaDataTxts, playerValues):
-            txt.set_text( s )
-            txt.draw(self.window)
+        self.window.draw(self.plaData)
         
         #draw fixed HUD text elements
         for txt in self.fixedHudText:
@@ -369,8 +358,10 @@ class Game:
         
         if self.player.hp > 0 and not self.paused and not self.console.open:
             # update game stats
-            self.points += dt #+1 point per second
+            self.player.points += dt #+1 point per second
             self.speed_level += dt/60.0 #speed_level will increase by 1 each 60 secs
+            
+            self.plaData.update(dt)
             
             # generate new entities
             if self.generate_entities:
@@ -414,7 +405,7 @@ class Game:
                 ent.stuck = False
                 if ent.hp <= 0:
                     ent.onDeath()
-                    self.points += ent.point_value
+                    self.player.points += ent.point_value
                     self.entities.remove(ent)
             
             # sort effect by priority
@@ -526,7 +517,7 @@ class Game:
         hs_index = self.getHSindex()
         if hs_index >= 0 and not self.cheated:
             self.highscores.pop()
-            self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.points), self.speed_level) )
+            self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.player.points), self.speed_level) )
         self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView, self.superhot)
         #save highscores
         with open("./highscores", 'wb') as fh:
@@ -535,14 +526,14 @@ class Game:
     def getHSindex(self):
         hs_index = -1
         for i, hse in enumerate(self.highscores):
-            if self.points > hse.points:
+            if self.player.points > hse.points:
                 hs_index = i
                 break
         return hs_index
 
 Game = Game()
 
-from utils import Vector, GUIText, Console
+from utils import Vector, GUIText, Console, PlayerHUD
 from powerup import RandomizePowerUp
 from entities import *
 from effects import TimedAction, NewEntityAction

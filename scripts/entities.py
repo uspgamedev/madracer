@@ -459,8 +459,8 @@ class Bomb(BaseEntity):
     def draw(self, window):
         self.drawEntity(window)
         self.countdown_text.set_text( "%.1f" % (self.lifetime) )
-        self.countdown_text.set_position(self.center())
-        self.countdown_text.draw(window)
+        self.countdown_text.position = self.center()
+        window.draw(self.countdown_text)
 
     def update(self, dt):
         self.lifetime -= dt

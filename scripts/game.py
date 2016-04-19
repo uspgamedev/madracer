@@ -112,15 +112,69 @@ class SoundManager:
         for s in toremove:
             self.sounds.remove(s)
 
+class HighScores(sf.Drawable):
+    def __init__(self):
+        sf.Drawable.__init__(self)
+        try:
+            with open("./highscores", 'rb') as fh:
+                self.scores = pickle.load(fh)
+        except:
+            self.scores = [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)]
+        
+    def updateGraphics(self, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
+        self.texts = []
+        rect = sf.RectangleShape(bounds.size)
+        rect.position = bounds.position
+        rect.fill_color = background_color
+        rect.outline_thickness = background_border_thickness
+        rect.outline_color = title_color
+        self.texts.append(rect)
+        #text highscore: esquerda, left-align, branco *
+        self.texts.append(GUIText("Highscores:", (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
+        #text HSE points: esquerda, right-align, branco *
+        hsY = self.texts[-1].bounds.bottom + 7
+        for i, hse in enumerate(self.scores):
+            #text HSE names: esquerda, left-align, amarelado *
+            hsName = str(i+1)+': '+hse.name
+            self.texts.append(GUIText(hsName, (bounds.left+2, hsY), GUIText.HOR_LEFT, names_color, 18))
+            if show_values_below:
+                hsY += 18
+            self.texts.append(GUIText("%i"%(hse.points), (bounds.right-2, hsY), GUIText.HOR_RIGHT, values_color, 18))
+            hsY += 18
+            mins, secs = Game.getTimeFromSpeedLevel(hse.level)
+            self.texts.append(GUIText("%im%is"%(mins,secs), (bounds.right-2, hsY), GUIText.HOR_RIGHT, values_color, 18))
+            hsY += 24
+            if not show_values_below:
+                hsY += 3
+        
+    def InsertScore(self, name, points, speedLvl):
+        hs_index = self.getHSindex(points)
+        if hs_index >= 0:
+            self.scores.pop()
+            self.scores.insert(hs_index, HighscoreEntry(name, points, speedLvl) )
+            self.save()
+        
+    def save(self):
+        with open("./highscores", 'wb') as fh:
+            pickle.dump(self.scores, fh)
+            
+    def getHSindex(self, points):
+        hs_index = -1
+        for i, hse in enumerate(self.scores):
+            if points > hse.points:
+                hs_index = i
+                break
+        return hs_index
+        
+    def draw(self, target, states):
+        for text in self.texts:
+            target.draw(text, states)
+            
 ################################################################
 class Game:
     fps = 30.0
     
-    try:
-        with open("./highscores", 'rb') as fh:
-            highscores = pickle.load(fh)
-    except:
-        highscores = [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)]
+    highscores = HighScores()
     
     images = TextureManager()
     animations = AnimationManager(images)
@@ -186,6 +240,7 @@ class Game:
         self.stretchView = stretchView
         self.player = Player(400, 400)
         self.updateGraphics()
+        self.initGraphics()
         self.player_name = []
         self.entities.append(self.player)
         
@@ -217,33 +272,6 @@ class Game:
         
         #text player values: direita, right-align, branco
         self.plaData = PlayerHUD(self.player, (width, 5))
-        
-        self.fixedHudText = []
-        #text commands: direita, left_align, amarelado *
-        #text player keys: direita, right-align, branco *
-        ckY = 145 + 2*18 #pos a little below the last text
-        self.fixedHudText.append(GUIText(self.input.name, (width-barWidth+6,ckY), GUIText.HOR_LEFT, sf.Color.RED, 18))
-        ckY += 18
-        for cmd, key in self.input.command_list():
-            self.fixedHudText.append(GUIText(cmd, (width-barWidth+6, ckY), GUIText.HOR_LEFT, hsCor, 18))
-            ckY += 18
-            self.fixedHudText.append(GUIText(key, (width, ckY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
-            ckY += 24
-        
-        #text highscore: esquerda, left-align, branco *
-        self.fixedHudText.append(GUIText("Highscores:", (0,20), GUIText.HOR_LEFT, sf.Color.RED, 18))
-        #text HSE points: esquerda, right-align, branco *
-        hsY = 50
-        for i, hse in enumerate(Game.highscores):
-            #text HSE names: esquerda, left-align, amarelado *
-            hsName = str(i+1)+': '+hse.name
-            self.fixedHudText.append(GUIText(hsName, (0, hsY), GUIText.HOR_LEFT, hsCor, 18))
-            hsY += 18
-            self.fixedHudText.append(GUIText("%i"%(hse.points), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
-            hsY += 18
-            mins, secs = self.getTimeFromSpeedLevel(hse.level)
-            self.fixedHudText.append(GUIText("%im%is"%(mins,secs), (barWidth-6, hsY), GUIText.HOR_RIGHT, sf.Color.WHITE, 18))
-            hsY += 24
             
         self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.pausedTxt.txt.style = sf.Text.BOLD
@@ -281,8 +309,6 @@ class Game:
                 hh = self.window.width * orisize.y / orisize.x
                 hh = hh / self.window.height
                 self.window.view.viewport = (0.0, (1.0 - hh)/2, 1.0, hh)
-
-        self.initGraphics()
         
     def getIDfor(self, ent):
         self.entCount += 1
@@ -309,34 +335,31 @@ class Game:
         
         self.window.draw(self.plaData)
         
-        #draw fixed HUD text elements
-        for txt in self.fixedHudText:
-            txt.draw(self.window)
-        
         #draw elements
         for ent in self.entities:
             ent.draw(self.window)
         
         #draw effects
         for eff in self.effects:
-            eff.draw(self.window)
+            self.window.draw(eff)
         
-        if self.input.target_dir() != None:
-            self.input.drawPlayerTarget(self.window)
+        self.window.draw(self.input)
                 
         if self.player.hp <= 0:
-            self.gameOverTxt.draw(self.window)
+            self.window.draw(self.highscores)
+            self.window.draw(self.gameOverTxt)
             if self.cheated:
                 self.restartTxt.set_text("Press ENTER to start a new game.\nCheating disables highscores.")
-            elif self.getHSindex() >= 0:
+            elif self.highscores.getHSindex(self.player.points) >= 0:
                 self.plaNameTxt.set_text("".join(self.player_name))
-                self.plaNameTxt.draw(self.window)
+                self.window.draw(self.plaNameTxt)
             else:
                 self.restartTxt.set_text("Press ENTER to start a new game.")
-            self.restartTxt.draw(self.window)
+            self.window.draw(self.restartTxt)
         else:
             if self.paused:
-                self.pausedTxt.draw(self.window)
+                self.window.draw(self.pausedTxt)
+                self.window.draw(self.highscores)
                 
         self.console.draw(self.window)
         
@@ -484,14 +507,24 @@ class Game:
                     
     def pause(self):
         self.paused = not self.paused
+        if self.paused and self.player.hp > 0:
+            self.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
+                                           sf.Color(0,0,0,180), 3)
+            self.input.updateGraphics(sf.Rectangle((680, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
+                                      sf.Color(0,0,0,180), 3)
+        else:
+            self.input.disableGraphics()
         
     def changeInput(self, update_graphics=True):
+        input_graphics_params = self.input.graphics_params
         while (True):
             self.input_index = (self.input_index+1) % len(input.available_inputs)
             self.input = input.available_inputs[self.input_index]()
             if self.input.valid():
                 break
         if update_graphics:
+            if len(input_graphics_params) > 0:
+                self.input.updateGraphics(*input_graphics_params)
             self.updateGraphics()
 
     def appendCharToPlayerName(self, c):
@@ -514,22 +547,9 @@ class Game:
     def startNewGame(self):
         if len(self.player_name) == 0:   
             self.player_name = ['?']*5
-        hs_index = self.getHSindex()
-        if hs_index >= 0 and not self.cheated:
-            self.highscores.pop()
-            self.highscores.insert(hs_index, HighscoreEntry("".join(self.player_name), round(self.player.points), self.speed_level) )
+        if not self.cheated:
+            self.highscores.InsertScore("".join(self.player_name), round(self.player.points), self.speed_level)
         self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView, self.superhot)
-        #save highscores
-        with open("./highscores", 'wb') as fh:
-            pickle.dump(self.highscores, fh)
-            
-    def getHSindex(self):
-        hs_index = -1
-        for i, hse in enumerate(self.highscores):
-            if self.player.points > hse.points:
-                hs_index = i
-                break
-        return hs_index
 
 Game = Game()
 

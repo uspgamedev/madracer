@@ -94,7 +94,7 @@ class Turret:
 def isInArray(value, array):
     return value in array
 
-class GUIText(object):
+class GUIText(sf.Drawable):
     #perhaps implement this inheriting from sf.Text instead of encapsulating it?
     HOR_LEFT = 0
     HOR_RIGHT = 1
@@ -102,6 +102,7 @@ class GUIText(object):
     CENTER = 3
     HOR_LEFT_VER_CENTER = 4
     def __init__(self, txt, pos, align=HOR_LEFT, color=sf.Color.BLACK, size=20):
+        sf.Drawable.__init__(self)
         self.txt = sf.Text(txt, game.Game.font, character_size=size)
         self.txt.color = color
         if type(pos) == type([]) or type(pos) == type(()):
@@ -167,16 +168,22 @@ class GUIText(object):
         self.align = a
         self.updateOrigin()
         
+    @property
     def position(self):
         return self.txt.position
-    def set_position(self, pos):
+    @position.setter
+    def position(self, pos):
         self.txt.position = pos if type(pos) == type([]) or type(pos) == type(()) else pos.toSFML()
         self.updateOrigin()
+        
+    @property
+    def bounds(self):
+        return self.txt.global_bounds
         
     def char_pos(self, index):
         return self.txt.find_character_pos(index)
         
-    def draw(self, window):
+    def draw(self, target, states):
         color = self.txt.color
         pos = self.txt.position
         if self.outline_color != None:
@@ -184,11 +191,11 @@ class GUIText(object):
             for xoff, yoff in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
                 self.txt.position = (pos.x + xoff*self.outline_thickness, pos.y + yoff*self.outline_thickness)
                 self.updateOrigin()
-                window.draw(self.txt)
+                target.draw(self.txt)
             self.txt.color = color
             self.txt.position = pos
             self.updateOrigin()
-        window.draw(self.txt, sf.RenderStates(shader=self.outline_shader))
+        target.draw(self.txt, sf.RenderStates(shader=self.outline_shader))
 
 class PlayerHUD(sf.Drawable):
     RIGHT = 0
@@ -437,7 +444,7 @@ class Console(code.InteractiveConsole):
         self.input = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+8), GUIText.HOR_LEFT, sf.Color.WHITE, 20)
         self.cursor = sf.RectangleShape((2, 20))
         self.cursor.fill_color = sf.Color.WHITE
-        self.cursor.position = self.input.position()
+        self.cursor.position = self.input.position
         self.num_outputs = int( (self.output_area.local_bounds.height - 16) / 12 )
         
     def processInput(self, e):

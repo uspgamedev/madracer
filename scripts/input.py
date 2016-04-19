@@ -4,7 +4,7 @@
 import sfml as sf
 import random, math
 from game import Game
-from utils import Vector, getEntClosestTo, raycastQuery, coneQuery
+from utils import Vector, getEntClosestTo, raycastQuery, coneQuery, GUIText
 
 ##########################################
 # NOTES ABOUT INPUT
@@ -30,7 +30,7 @@ from utils import Vector, getEntClosestTo, raycastQuery, coneQuery
 # in the game over screen.
 #########################################
 
-class InputInterface:
+class InputInterface(sf.Drawable):
     MOVE_LEFT = 0
     MOVE_RIGHT = 1
     MOVE_UP = 2
@@ -46,8 +46,11 @@ class InputInterface:
     TOGGLE_FPS_DISPLAY = 11
     
     def __init__(self, name):
+        sf.Drawable.__init__(self)
         self.name = name
         self.loop_commands = []
+        self.texts = []
+        self.graphics_params = ()
         
     def drawPlayerTarget(self, window):
         # draw what is necessary to show the player target (where he'll shoot at)
@@ -75,6 +78,39 @@ class InputInterface:
         # inputs. Particularly needed for "optional" plug-and-play methods such as
         # gamepads.
         return True
+       
+    def graphics_enabled(self):
+        return len(self.texts) > 0
+    def disableGraphics(self):
+        self.texts = []
+        self.graphics_params = ()
+    def updateGraphics(self, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
+        self.graphics_params = (bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness)
+        self.texts = []
+        rect = sf.RectangleShape(bounds.size)
+        rect.position = bounds.position
+        rect.fill_color = background_color
+        rect.outline_thickness = background_border_thickness
+        rect.outline_color = title_color
+        self.texts.append(rect)
+        #text commands: direita, left_align, amarelado *
+        #text player keys: direita, right-align, branco *
+        self.texts.append(GUIText(self.name, (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
+        ckY = self.texts[-1].bounds.bottom + 7
+        for cmd, key in self.command_list():
+            self.texts.append(GUIText(cmd, (bounds.left+2, ckY), GUIText.HOR_LEFT, names_color, 18))
+            if show_values_below:
+                ckY += 18
+            self.texts.append(GUIText(key, (bounds.right-2, ckY), GUIText.HOR_RIGHT, values_color, 18))
+            ckY += 24
+            if not show_values_below:
+                ckY += 3
+            
+    def draw(self, target, states):
+        if self.target_dir() != None:
+            self.drawPlayerTarget(target)
+        for text in self.texts:
+            target.draw(text, states)
         
 class KeyboardInput(InputInterface):
     def __init__(self):

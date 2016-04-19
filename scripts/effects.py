@@ -8,8 +8,9 @@ from game import Game
 
 #******************************** EFFECTS ************************************
 ### EXPLOSIONS?!?
-class Explosion:
+class Explosion(sf.Drawable):
     def __init__(self, center, size, speed, type):
+        sf.Drawable.__init__(self)
         self.base_speed = speed
         self.size = Vector(size,size)
         self.pos = center - self.size*0.5
@@ -46,10 +47,10 @@ class Explosion:
         if self.frame_index >= self.type.num_frames:# or self.limitInRect(Game.track_pos, Game.track_area):
             self.destroyed = True
 
-    def draw(self, window):
+    def draw(self, target, states):
         self.spr.position = self.pos.toSFML() #sprite position
         self.spr.ratio = (self.size.x/self.sw, self.size.y/self.sh) #scale factor
-        window.draw(self.spr)
+        target.draw(self.spr, states)
 
     def limitInRect(self, pos, size):
         center = self.center()
@@ -109,8 +110,9 @@ def CreateVehicleDustCloud(ent):
 # TimedAction is a effect that executes a single action once after a set period of time.
 # Actions have a draw method, to draw something if needed while they are running.
 # Actions have a __call__ method, executed when they are processed.
-class TimedAction:
+class TimedAction(sf.Drawable):
     def __init__(self, lifetime, action):
+        sf.Drawable.__init__(self)
         self.destroyed = action == None
         self.priority = 10
         self.action = action
@@ -124,8 +126,8 @@ class TimedAction:
             self.action()
         self.action.update(dt, self.elapsed / self.lifetime)
             
-    def draw(self, window):
-        self.action.draw(window)
+    def draw(self, target, states):
+        self.action.draw(target, states)
             
 ### ACTIONS
 class NewEntityAction:
@@ -181,6 +183,6 @@ class NewEntityAction:
                 self.blink_state = (self.blink_state + 1) % len(self.fills)
                 self.tri.fill_color = self.fills[self.blink_state]
             
-    def draw(self, window):
-        window.draw(self.tri)
-        self.alert.draw(window)
+    def draw(self, window, states):
+        window.draw(self.tri, states)
+        window.draw(self.alert, states)

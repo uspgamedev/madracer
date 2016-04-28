@@ -16,3 +16,18 @@ Mad-Max inspired top-down racing/shooter game: dodge enemies and obstacles while
   * Keyboard and Mouse: targeting is nearest enemy to the mouse position.
   * GamePad (plug-and-play): targeting is nearest enemy in a cone towards selected direction.
 * Locally-saved, persistent top-10 high scores.
+
+## How to play
+Game requirements are simple:
+* Latest Python v2 version.
+* [Python-SFML](http://www.python-sfml.org/index.html)
+
+To execute the game:
+
+1. Go to the root directory of the repository.
+2. Execute **python madracer.py** to start the game.
+3. Enjoy!
+4. Note: execute **python madracer.py --help** to display command-line arguments help.
+
+While in-game...:
+* We think it is pretty straight-forward to play the game, but if you're having difficulties, both keyboard-based input-methods use SPACE to pause the game. In the pause-screen, the available commands are displayed.

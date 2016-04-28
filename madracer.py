@@ -60,6 +60,8 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
             if type(event) in [sf.MouseWheelEvent, sf.MouseButtonEvent, sf.MouseMoveEvent, sf.JoystickMoveEvent, sf.JoystickButtonEvent, sf.JoystickConnectEvent]:
                 if not Game.console.open:
                     Game.input.receiveInputEvent(event)
+                elif type(event) == sf.MouseWheelEvent:
+                    Game.console.processInput(event)
         
         for cmd in Game.input.loop_commands:
             if cmd == input.InputInterface.CLOSE:

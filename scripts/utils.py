@@ -428,16 +428,16 @@ class Console(code.InteractiveConsole):
         self.line_index = 0
         self.stdout = sys.stdout
         
-    def initGraphics(self):
+    def initGraphics(self, rect):
         if self.initialized:    return
         self.initialized = True
-        self.output_area = sf.RectangleShape((800, 700/2))
-        self.output_area.position = (100, 3)
+        self.output_area = sf.RectangleShape(rect.size)
+        self.output_area.position = rect.position
         self.output_area.fill_color = sf.Color(0,0,0,180)
         self.output_area.outline_thickness = 3
         self.output_area.outline_color = sf.Color.GREEN
-        self.input_area = sf.RectangleShape((800, 33))
-        self.input_area.position = 100, self.output_area.global_bounds.bottom
+        self.input_area = sf.RectangleShape((rect.width, 33))
+        self.input_area.position = rect.left, self.output_area.global_bounds.bottom
         self.input_area.fill_color = sf.Color(0,0,0,180)
         self.input_area.outline_thickness = 3
         self.input_area.outline_color = sf.Color.BLUE
@@ -445,7 +445,8 @@ class Console(code.InteractiveConsole):
         self.cursor = sf.RectangleShape((2, 20))
         self.cursor.fill_color = sf.Color.WHITE
         self.cursor.position = self.input.position
-        self.num_outputs = int( (self.output_area.local_bounds.height - 16) / 12 )
+        self.output_char_size = 12  
+        self.num_outputs = int( (self.output_area.local_bounds.height - 16) / self.output_char_size )
         
     def processInput(self, e):
         if type(e) == sf.TextEvent and self.open:
@@ -520,7 +521,13 @@ class Console(code.InteractiveConsole):
                 self.output_index += 1
                 if self.output_index > len(self.outputs) - self.num_outputs:
                     self.output_index -= 1
-    
+        elif type(e) == sf.MouseWheelEvent:
+            self.output_index -= e.delta
+            if self.output_index > len(self.outputs) - self.num_outputs:
+                self.output_index = len(self.outputs) - self.num_outputs
+            if self.output_index < 0:
+                self.output_index = 0
+                
     def push(self, line):
         ### OVERWRITING InteractiveConsole.push to print stuff to graphical console
         sys.stdout = self
@@ -540,25 +547,27 @@ class Console(code.InteractiveConsole):
             traceback.print_exc(file=sys.stderr)
     
     def addOutput(self, out, color=sf.Color.WHITE):
-        out = str(out.encode("ascii", "ignore"))
-        
-        wraps = wrapText(self.output_area.local_bounds.width - 5, out, 12)
-        for s in wraps:
-            txt = sf.Text()
-            txt = sf.Text(s, game.Game.font, character_size=12)
-            txt.color = color
-            self.outputs.append(txt)
-            if len(self.outputs) - self.output_index > self.num_outputs:
-                self.output_index += 1
+        fullout = str(out.encode("ascii", "ignore"))
+        for out in fullout.split("\n"):
+            wraps = wrapText(self.output_area.local_bounds.width - 5, out, self.output_char_size)
+            for s in wraps:
+                txt = sf.Text()
+                txt = sf.Text(s, game.Game.font, character_size=self.output_char_size)
+                txt.color = color
+                self.outputs.append(txt)
+                if len(self.outputs) - self.output_index > self.num_outputs:
+                    self.output_index += 1
             
     def drawOutputs(self, window):
-        oY = 8
+        oY = self.output_area.global_bounds.top + 5
         for i in xrange(self.output_index, self.num_outputs+self.output_index):
             if i >= len(self.outputs):  break
             txt = self.outputs[i]
-            txt.position = (100, oY)
+            if oY + txt.character_size > self.output_area.global_bounds.height:
+                break
+            txt.position = (self.output_area.global_bounds.left+3, oY)
             window.draw(txt)
-            oY += 12
+            oY += txt.character_size
         
     def draw(self, window):
         if not self.open:   return
@@ -566,8 +575,8 @@ class Console(code.InteractiveConsole):
         window.draw(self.input_area)
         self.drawOutputs(window)
         self.input.set_text(self.line)
-        self.input.draw(window)
-        self.cursor.position = self.input.char_pos(self.line_index).x, self.input.position().y
+        window.draw(self.input)
+        self.cursor.position = self.input.char_pos(self.line_index).x, self.input.position.y
         window.draw(self.cursor)
     
 ################################################################

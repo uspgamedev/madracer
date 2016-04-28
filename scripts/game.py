@@ -213,7 +213,7 @@ class Game:
         self.font = font
         self.entities = []
         self.effects = []
-        self.console.initGraphics()
+        self.console.initGraphics(sf.Rectangle((100, 3), (800, 700/2)) )
         self.input = input.available_inputs[self.input_index]()
         if not self.input.valid():
             self.changeInput(False)

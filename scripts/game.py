@@ -453,7 +453,7 @@ class Game:
         self.console.processInput(e)
         if not self.console.open:
             if self.player.hp <= 0:
-                if not e.unicode in [8,13] and len(self.player_name) < 8: # any text char, except newline and backspace
+                if not e.unicode in [ord('\b'),ord('\n'),ord('\r')] and len(self.player_name) < 8: # any text char, except newline and backspace
                     try:
                         self.player_name.append( chr(e.unicode) )
                     except:

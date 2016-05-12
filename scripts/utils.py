@@ -425,9 +425,22 @@ class Console(code.InteractiveConsole):
         self.log = []
         self.log_index = 0
         self.line = ""
-        self.line_index = 0
+        self._lineindex = 0
         self.stdout = sys.stdout
         
+    @property
+    def line_index(self):
+        return self._lineindex
+    @line_index.setter
+    def line_index(self, i):
+        self._lineindex = i
+        if self._lineindex < 0:
+            self._lineindex = 0
+        if self._lineindex > len(self.line):
+            self._lineindex = len(self.line)
+        size = getTextSize(self.line[:self._lineindex], self.input.txt.character_size, self.font)
+        self.cursor.position = self.input.position.x + size - 2, self.input.position.y
+       
     def initGraphics(self, rect):
         if self.initialized:    return
         self.initialized = True
@@ -445,13 +458,16 @@ class Console(code.InteractiveConsole):
         self.cursor = sf.RectangleShape((2, 20))
         self.cursor.fill_color = sf.Color.WHITE
         self.cursor.position = self.input.position
+        self.scrollbar = sf.RectangleShape((5, self.output_area.size.y))
+        self.scrollbar.fill_color = sf.Color.RED
+        self.scrollbar.position = rect.right-self.scrollbar.size.x, rect.top
         self.output_char_size = 12  
         self.num_outputs = int( (self.output_area.local_bounds.height - 16) / self.output_char_size )
         
     def processInput(self, e):
         if type(e) == sf.TextEvent and self.open:
             # So ENTER(13)/BACKSPACE(8)/TAB(9) aparentemente podem vir aqui.
-            if e.unicode == 13: #ENTER
+            if e.unicode == ord('\r') or e.unicode == ord('\n'): #ENTER \n ou \r
                 if len(self.line) > 0:
                     self.log.insert(0, self.line)
                     try:
@@ -462,12 +478,10 @@ class Console(code.InteractiveConsole):
                     self.line = ""
                     self.line_index = 0
                     self.log_index = 0
-            elif e.unicode == 8: #BACKSPACE
+            elif e.unicode == ord('\b'): #BACKSPACE   \b
                 if len(self.line) > 0:
                     self.line = self.line[:self.line_index-1] + self.line[self.line_index:]
                     self.line_index -= 1
-                    if self.line_index < 0:
-                        self.line_index = 0
             else:
                 try:
                     c = str(chr(e.unicode))
@@ -482,12 +496,8 @@ class Console(code.InteractiveConsole):
             elif self.open and e.released:
                 if e.code == sf.Keyboard.LEFT:
                     self.line_index -= 1
-                    if self.line_index < 0:
-                        self.line_index = 0
                 elif e.code == sf.Keyboard.RIGHT:
                     self.line_index += 1
-                    if self.line_index > len(self.line):
-                        self.line_index = len(self.line)
                 elif e.code == sf.Keyboard.UP:
                     self.log_index += 1
                     li = self.log_index - 1
@@ -496,7 +506,9 @@ class Console(code.InteractiveConsole):
                         self.line_index = len(self.line)
                     elif li >= len(self.log):
                         self.log_index = len(self.log)
-                        self.line = self.log[self.log_index-1]
+                        if len(self.log) > 0:
+                            self.line = self.log[self.log_index-1]
+                            self.line_index = len(self.line)
                 elif e.code == sf.Keyboard.DOWN:
                     self.log_index -= 1
                     li = self.log_index - 1
@@ -506,6 +518,7 @@ class Console(code.InteractiveConsole):
                     elif li < 0:
                         self.log_index = 0
                         self.line = ""
+                        self.line_index = 0
                 elif e.code == sf.Keyboard.DELETE:
                     if len(self.line) > 0:
                         self.line = self.line[:self.line_index] + self.line[self.line_index+1:]
@@ -574,9 +587,15 @@ class Console(code.InteractiveConsole):
         window.draw(self.output_area)
         window.draw(self.input_area)
         self.drawOutputs(window)
+        if len(self.outputs) > 0:
+            self.scrollbar.position = self.scrollbar.position.x, self.output_area.position.y + self.output_area.size.y * self.output_index / len(self.outputs)
+            bar_h = self.num_outputs * self.output_area.size.y / len(self.outputs)
+            if bar_h > self.output_area.size.y:
+                bar_h = self.output_area.size.y
+            self.scrollbar.size = self.scrollbar.size.x, bar_h
+        window.draw(self.scrollbar)
         self.input.set_text(self.line)
         window.draw(self.input)
-        self.cursor.position = self.input.char_pos(self.line_index).x, self.input.position.y
         window.draw(self.cursor)
     
 ################################################################

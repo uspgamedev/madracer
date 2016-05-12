@@ -415,7 +415,7 @@ def wrapText(width, s, char_size, is_bold=False):
  
 ################################################################
 # Console
-class Console(code.InteractiveConsole):
+class Console(object,code.InteractiveConsole):
     def __init__(self, locals={}):
         code.InteractiveConsole.__init__(self, dict(globals().items() + locals.items()), "__console__")
         self.open = False
@@ -438,7 +438,7 @@ class Console(code.InteractiveConsole):
             self._lineindex = 0
         if self._lineindex > len(self.line):
             self._lineindex = len(self.line)
-        size = getTextSize(self.line[:self._lineindex], self.input.txt.character_size, self.font)
+        size = getTextSize(self.line[:self._lineindex], self.input.txt.character_size, game.Game.font)
         self.cursor.position = self.input.position.x + size - 2, self.input.position.y
        
     def initGraphics(self, rect):

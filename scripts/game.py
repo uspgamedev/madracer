@@ -505,8 +505,8 @@ class Game:
                         self.generate_entities = not self.generate_entities
                         self.cheated = True
                     
-    def pause(self):
-        self.paused = not self.paused
+    def pause(self, forcePaused=None):
+        self.paused = (not self.paused) if (forcePaused == None) else (forcePaused)
         if self.paused and self.player.hp > 0:
             self.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
                                            sf.Color(0,0,0,180), 3)

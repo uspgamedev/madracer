@@ -34,7 +34,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
     def updateFPStextPos():
         tfps.position = Game.track_pos.x, 5#(window.width-250, window.height-60)
     updateFPStextPos()
-    showFps = True
+    showFps = False
     
     clock = sf.Clock()
     clock.restart()
@@ -49,7 +49,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
             if type(event) is sf.ResizeEvent:
                 Game.updateGraphics()
             if type(event) is sf.FocusEvent:
-                Game.paused = event.lost
+                Game.pause(event.lost)
             if type(event) is sf.KeyEvent:
                 if event.code == sf.Keyboard.ESCAPE:
                     window.close();

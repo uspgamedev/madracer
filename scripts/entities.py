@@ -4,9 +4,10 @@
 import sfml as sf
 import random, math
 from game import Game
-from utils import Vector, GUIText, isInArray, Turret
+from utils import Vector, GUIText, isInArray, Turret, PlayerHUD
 from effects import CreateVehicleDustCloud, CreateVehicleCollision, CreateVehicleExplosion, CreateExplosionAt
 import powerup
+import input
 
 #******************************** ENTITIES ************************************
 class BaseEntity:
@@ -126,8 +127,9 @@ class BaseEntity:
 
 #************* Player ****************
 class Player(BaseEntity):
-    def __init__(self, x, y):
+    def __init__(self, x, y, name, input_index):
         BaseEntity.__init__(self, 'player', x, y, 32, 60, sf.Color.GREEN, 4, 150, 0)
+        self.name = name
         self.bombs = 3
         self.max_shots = 25
         self.shots_available = self.max_shots
@@ -139,15 +141,27 @@ class Player(BaseEntity):
         self.shot_speed = 15
         self.points = 0
         self.turret = Turret(self)
+        self.hud = PlayerHUD(self, (Game.window.view.size.x, 5))
+        self.input_index = input_index
+        self.input = input.available_inputs[self.input_index](self)
+        if not self.input.valid():
+            self.changeInput(False)
         
     def draw(self, window):
         BaseEntity.drawEntity(self, window)
         BaseEntity.drawHPBar(self, window)
-        dir = Game.input.target_dir()
+        dir = self.input.target_dir()
         self.turret.draw(window, dir)
+        
+    def drawUI(self, window):
+        window.draw(self.hud)
+        window.draw(self.input)
 
     def update(self, dt):
-        moveDelta = Game.input.move_dir().copy()
+        self.input.update(dt)
+        self.hud.update(dt)
+    
+        moveDelta = self.input.move_dir().copy()
         self.move(moveDelta)
         CreateVehicleDustCloud(self)
         
@@ -161,7 +175,7 @@ class Player(BaseEntity):
 
     def fire(self):
         if self.cooldown_elapsed >= self.cooldown_time and self.shots_available > 0:
-            dir = Game.input.target_dir()
+            dir = self.input.target_dir()
             init_pos = self.center()
             projectile = Projectile(init_pos.x, init_pos.y, self.shot_dmg, self.shot_speed, dir, 2, sf.Color.GREEN)
             projectile.cant_hit.append(self.type)
@@ -177,10 +191,10 @@ class Player(BaseEntity):
             bomb = Bomb(self.pos.x, self.pos.y, Vector(0,1), 1, 120, 200)
             Game.entities.append(bomb)
     def shoot_bomb(self):
-        if self.bombs > 0 and Game.input.target_dir() != None:
+        if self.bombs > 0 and self.input.target_dir() != None:
             #shoot bomb
             self.bombs -= 1
-            dir = Game.input.target_dir()
+            dir = self.input.target_dir()
             bomb = Bomb(self.pos.x, self.pos.y, dir, 2, 90, 120)
             Game.entities.append(bomb)
 
@@ -189,6 +203,17 @@ class Player(BaseEntity):
 
     def onDeath(self):
         CreateVehicleExplosion(self)
+
+    def changeInput(self, update_graphics=True):
+        input_graphics_params = self.input.graphics_params
+        while (True):
+            self.input_index = (self.input_index+1) % len(input.available_inputs)
+            self.input = input.available_inputs[self.input_index](self)
+            if self.input.valid():
+                break
+        if update_graphics:
+            if len(input_graphics_params) > 0:
+                self.input.updateGraphics(*input_graphics_params)
 #end class Player
 
 #*********** Berserker ******************

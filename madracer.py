@@ -40,24 +40,12 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
             # close window: exit
             if type(event) is sf.CloseEvent:
                 window.close()
-            if type(event) is sf.ResizeEvent:
+            elif type(event) is sf.ResizeEvent:
                 Game.updateGraphics()
-            if type(event) is sf.FocusEvent:
-                Game.pause(event.lost)
-            if type(event) is sf.KeyEvent:
-                if event.code == sf.Keyboard.ESCAPE:
-                    window.close();
-                else:
-                    Game.processInput(event)
-            if type(event) is sf.TextEvent:
-                Game.processTextInput(event)
-            if type(event) in [sf.MouseWheelEvent, sf.MouseButtonEvent, sf.MouseMoveEvent, sf.JoystickMoveEvent, sf.JoystickButtonEvent, sf.JoystickConnectEvent]:
-                if not Game.console.open:
-                    Game.input.receiveInputEvent(event)
-                elif type(event) == sf.MouseWheelEvent:
-                    Game.console.processInput(event)
+            else:
+                Game.processInput(event)
         
-        for cmd in Game.input.loop_commands:
+        for cmd in Game.player.input.loop_commands:
             if cmd == input.InputInterface.CLOSE:
                 window.close();
             elif cmd == input.InputInterface.TOGGLE_FULLSCREEN:
@@ -75,7 +63,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
                 updateFPStextPos()
             elif cmd == input.InputInterface.TOGGLE_FPS_DISPLAY:
                 showFps = not showFps
-        Game.input.loop_commands = []
+        Game.player.input.loop_commands = []
         
         window.clear() # clear screen
 

@@ -45,9 +45,10 @@ class InputInterface(sf.Drawable):
     CLOSE = 10
     TOGGLE_FPS_DISPLAY = 11
     
-    def __init__(self, name):
+    def __init__(self, name, player):
         sf.Drawable.__init__(self)
         self.name = name
+        self.player = player
         self.loop_commands = []
         self.texts = []
         self.graphics_params = ()
@@ -67,7 +68,7 @@ class InputInterface(sf.Drawable):
     def move_dir(self):
         return Vector(0,0)
         
-    def receiveInputEvent(self, e):
+    def processInput(self, e):
         pass
         
     def update(self, dt):
@@ -113,8 +114,8 @@ class InputInterface(sf.Drawable):
             target.draw(text, states)
         
 class KeyboardInput(InputInterface):
-    def __init__(self):
-        InputInterface.__init__(self, 'Keyboard')
+    def __init__(self, player):
+        InputInterface.__init__(self, 'Keyboard', player)
         self.target = None
         self.try_fire = False
         self.targetDisplay = sf.RectangleShape()
@@ -146,7 +147,7 @@ class KeyboardInput(InputInterface):
         # how to get player target, given that it might change with input (autoaim, mouse target, etc)
         dir = None
         if self.target != None:
-            dir = self.target.center() - Game.player.center()
+            dir = self.target.center() - self.player.center()
             dir.normalize()
         return dir
         
@@ -163,14 +164,14 @@ class KeyboardInput(InputInterface):
             dir.y = 1
         return dir
         
-    def receiveInputEvent(self, e):
+    def processInput(self, e):
         if type(e) != sf.KeyEvent:  return
         isDown = not e.released
-        if Game.player.hp > 0 and not Game.paused:
+        if self.player.hp > 0 and not Game.paused:
             if e.code == sf.Keyboard.S and not isDown:
-                Game.player.release_bomb()
+                self.player.release_bomb()
             elif e.code == sf.Keyboard.W and not isDown:
-                Game.player.shoot_bomb()
+                self.player.shoot_bomb()
             elif e.code == sf.Keyboard.D:
                 #shoot back!
                 self.try_fire = isDown
@@ -187,22 +188,22 @@ class KeyboardInput(InputInterface):
             # TOGGLE SHOW FPS
             self.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
         elif e.code == sf.Keyboard.F2 and e.released:
-            Game.changeInput()
+            self.player.changeInput()
         elif e.code == sf.Keyboard.SPACE and e.released:
             Game.pause()
             #Game.paused = True
         
     def update(self, dt):
-        self.target = getEntClosestTo(Game.player.center())
+        self.target = getEntClosestTo(self.player.center())
                 
         if self.target_dir() != None and self.try_fire:
-            Game.player.fire()
+            self.player.fire()
             
 ########################################
         
 class MouseKeyInput(InputInterface):
-    def __init__(self):
-        InputInterface.__init__(self, 'Mouse&Key')
+    def __init__(self, player):
+        InputInterface.__init__(self, 'Mouse&Key', player)
         self.try_fire = False
         self.mouseDisplay = sf.CircleShape(15, 5)
         self.mouseDisplay.fill_color = sf.Color.TRANSPARENT
@@ -247,7 +248,7 @@ class MouseKeyInput(InputInterface):
         mouse = sf.Mouse.get_position(Game.window)
         target = getEntClosestTo(mouse)
         dir = target.center() if target != None else Vector(mouse.x, mouse.y)
-        dir = dir - Game.player.center()
+        dir = dir - self.player.center()
         dir.normalize()
         return dir
         
@@ -264,13 +265,13 @@ class MouseKeyInput(InputInterface):
             dir.y = 1
         return dir
         
-    def receiveInputEvent(self, e):
-        if Game.player.hp > 0 and not Game.paused:
+    def processInput(self, e):
+        if self.player.hp > 0 and not Game.paused:
             if type(e) == sf.KeyEvent and e.code == sf.Keyboard.E and e.released:
-                Game.player.release_bomb()
+                self.player.release_bomb()
             elif type(e) == sf.MouseButtonEvent:
                 if e.button == sf.Mouse.RIGHT and e.released: #mouse right
-                    Game.player.shoot_bomb()
+                    self.player.shoot_bomb()
                 elif e.button == sf.Mouse.LEFT: #mouse left
                     #shoot back!
                     self.try_fire = not e.released
@@ -286,13 +287,13 @@ class MouseKeyInput(InputInterface):
                 # TOGGLE SHOW FPS
                 self.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
             elif e.code == sf.Keyboard.F2 and e.released:
-                Game.changeInput()
+                self.player.changeInput()
             elif e.code == sf.Keyboard.SPACE and e.released:
                 Game.pause()
         
     def update(self, dt):
         if self.try_fire:
-            Game.player.fire()
+            self.player.fire()
 
 ########################################
         
@@ -316,8 +317,8 @@ class GamePadInput(InputInterface):
     # strange that vertical direction is flipped in relation to the other axes
     HAT_HOR = 7 # + is right
     HAT_VER = 6 # + is up
-    def __init__(self):
-        InputInterface.__init__(self, 'GamePad')
+    def __init__(self, player):
+        InputInterface.__init__(self, 'GamePad', player)
         self.try_fire = False
         self.target = Vector(0,0)
         self.move = Vector(0,0)
@@ -341,9 +342,9 @@ class GamePadInput(InputInterface):
     def updateTargetDir(self, dist):
         d = self.target
         d.normalize()
-        arrowStart = Game.player.center() + d*10
+        arrowStart = self.player.center() + d*10
         self.targetDirDisplay[0].position = arrowStart.toSFML()
-        arrowBase = Game.player.center() + d*dist
+        arrowBase = self.player.center() + d*dist
         self.targetDirDisplay[1].position = arrowBase.toSFML()
         
         arrowLeft = arrowBase + d.perpendicular()*10
@@ -360,11 +361,11 @@ class GamePadInput(InputInterface):
         
     def drawPlayerTarget(self, window):
         target = None
-        #dist = (Game.track_area*0.5 - Game.player.center()).len()
-        dist = Game.player.center().len()
+        #dist = (Game.track_area*0.5 - self.player.center()).len()
+        dist = self.player.center().len()
         dist = min(dist, Game.track_area.len()/2)
-        #query = raycastQuery(Game.player.center(), self.target)
-        query = coneQuery(Game.player.center(), self.target, math.pi/4)
+        #query = raycastQuery(self.player.center(), self.target)
+        query = coneQuery(self.player.center(), self.target, math.pi/4)
         if len(query) > 0:
             dist, target = query[0]
     
@@ -377,7 +378,7 @@ class GamePadInput(InputInterface):
             self.targetDisplay.size = tsize.toSFML()
             window.draw(self.targetDisplay)
             
-        if Game.player.hp <= 0 and Game.getHSindex() >= 0:
+        if self.player.hp <= 0 and Game.getHSindex() >= 0:
             tpos = Game.plaNameTxt.char_pos(self.text_index)
             self.textCursor.position = tpos.x, tpos.y + 30
             window.draw(self.textCursor)
@@ -399,25 +400,25 @@ class GamePadInput(InputInterface):
         # how to get player target, given that it might change with input (autoaim, mouse target, etc)
         target = None
         #query = raycastQuery(Game.player.center(), self.target)
-        query = coneQuery(Game.player.center(), self.target, math.pi/4)
+        query = coneQuery(self.player.center(), self.target, math.pi/4)
         if len(query) > 0:
             target = query[0].entity
-        dir = (target.center() - Game.player.center() ) if target != None else self.target.copy()
+        dir = (target.center() - self.player.center() ) if target != None else self.target.copy()
         dir.normalize()
         return dir
         
     def move_dir(self):
         return self.move
         
-    def receiveInputEvent(self, e):
-        if Game.player.hp > 0 and not Game.paused:
+    def processInput(self, e):
+        if self.player.hp > 0 and not Game.paused:
             if type(e) == sf.JoystickButtonEvent:
                 if e.button == GamePadInput.RIGHT_TRIGGER and e.released and (self.target.x != 0 or self.target.y != 0):
-                    Game.player.shoot_bomb()
+                    self.player.shoot_bomb()
                 elif e.button == GamePadInput.RIGHT_BUTTON:
                     self.try_fire = e.pressed
                 elif e.button == GamePadInput.X and e.released:
-                    Game.player.release_bomb()
+                    self.player.release_bomb()
             if type(e) == sf.JoystickMoveEvent:
                 if e.axis == GamePadInput.LEFT_HOR_AXIS:
                     self.move.x = e.position/100 if abs(e.position) >= 1 else 0.0
@@ -427,7 +428,7 @@ class GamePadInput(InputInterface):
                     self.target.x = e.position/100 if abs(e.position) >= 1 else 0.0
                 if e.axis == GamePadInput.RIGHT_VER_AXIS:
                     self.target.y = e.position/100 if abs(e.position) >= 1 else 0.0
-        elif Game.player.hp <= 0:
+        elif self.player.hp <= 0:
             if type(e) == sf.JoystickButtonEvent:
                 if e.button == GamePadInput.X and e.released:
                     Game.startNewGame()
@@ -471,16 +472,16 @@ class GamePadInput(InputInterface):
                 # TOGGLE SHOW FPS
                 self.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
             elif e.button == GamePadInput.TRIANGLE and e.released:
-                Game.changeInput()
+                self.player.changeInput()
             elif e.button == GamePadInput.CIRCLE and e.released:
                 Game.pause()
                 
         if type(e) == sf.JoystickConnectEvent and e.disconnected == True:
-            Game.changeInput()
+            self.player.changeInput()
         
     def update(self, dt):
         if self.try_fire and (self.target.x != 0 or self.target.y != 0):
-            Game.player.fire()
+            self.player.fire()
             
     def valid(self):
         return sf.Joystick.is_connected(0)

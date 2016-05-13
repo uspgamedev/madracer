@@ -94,6 +94,140 @@ class Turret:
 def isInArray(value, array):
     return value in array
 
+def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
+    target = None
+    min_dist = game.Game.track_area.squaredLen()
+    for i in xrange(1, len(game.Game.entities)):
+        ent = game.Game.entities[i]
+        if ent.hp <= 0 or not ent.type in validTargets:
+            continue
+        dist = ent.center() - point
+        if dist.squaredLen() < min_dist: #yay raizes desnecessarias!
+            min_dist = dist.squaredLen()
+            target = ent
+    return target
+        
+def createPointMark(pos, radius, color):
+    circle_res = 16 #in line segments
+    mark = sf.VertexArray(sf.PrimitiveType.LINES, 2*(2+circle_res))
+    circle_points = []
+    angle_step = 2 * pi / circle_res
+    angle = 0.0
+    for i in xrange(circle_res):
+        dir = sf.Vector2(cos(angle), sin(angle))
+        p = dir*radius
+        circle_points.append(p)
+        circle_points.append(p)
+        angle += angle_step
+    circle_points.append(circle_points.pop(0))
+    for i in xrange(circle_res*2):
+        mark[i].position = circle_points[i]
+        mark[i].color = color
+        
+    cross = [sf.Vector2(radius, 0), #left
+             sf.Vector2(-radius, 0), #right
+             sf.Vector2(0, radius), #top
+             sf.Vector2(0, -radius)] #bottom
+    for i in xrange(4):
+        mark[circle_res*2 + i].position = cross[i]
+        mark[circle_res*2 + i].color = color
+    return mark
+    
+def getLineEquation(p1, p2):
+    A = p2.y - p1.y
+    B = p1.x - p2.x
+    C = p2.x * p1.y - p1.x * p2.y
+    def f(p):
+        return A*p.x + B*p.y + C
+    return f
+    
+RaycastEntry = namedtuple("RaycastEntry", "distance entity")
+def raycastQuery(point, dir, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
+    hits = []
+    if dir.x == 0 and dir.y == 0:
+        return hits
+        
+    endPoint = point + dir*game.Game.track_area.len()
+    eq = getLineEquation(point, endPoint)
+    def onWhichSide(p):
+        v = eq(p)
+        if v != 0:
+            return v / abs(v)
+        return 0
+    
+    for i in xrange(len(game.Game.entities)):
+        ent = game.Game.entities[i]
+        if ent.hp <= 0 or not ent.type in validTargets:
+            continue
+        dist = ent.center() - point
+        if abs(dir.angleBetween(dist)) > math.pi/2:
+            continue
+        verts = ent.vertices()
+        sides = [onWhichSide(p) for p in verts]
+        #print "%s %i has sides: [%i,%i,%i,%i] (sum = %s) verts=%s" % (ent.type, ent.ID, sides[0], sides[1], sides[2], sides[3], sum(sides), verts)
+        if abs(sum(sides)) < 4:
+            hits.append( RaycastEntry(dist.len(), ent) )
+            
+    def comp(a,b):
+        v = int(a.distance - b.distance)
+        if v != 0:
+            return v / abs(v)
+        return 0
+    hits.sort(comp)
+            
+    return hits
+    
+def coneQuery(point, dir, angle, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
+    hits = []
+    if dir.x == 0 and dir.y == 0:
+        return hits
+    
+    for i in xrange(len(game.Game.entities)):
+        ent = game.Game.entities[i]
+        if ent.hp <= 0 or not ent.type in validTargets:
+            continue
+        dist = ent.center() - point
+        if abs(dir.angleBetween(dist)) > angle:
+            continue
+        hits.append( RaycastEntry(dist.len(), ent) )
+            
+    def comp(a,b):
+        v = int(a.distance - b.distance)
+        if v != 0:
+            return v / abs(v)
+        return 0
+    hits.sort(comp)
+            
+    return hits
+
+#######################################################################
+# UI Stuff
+def getTextSize(s, char_size, is_bold=False):
+    size = 0
+    for i, c in enumerate(s):
+        code = ord(c)
+        size += game.font.get_glyph(code, char_size, is_bold).advance
+        if i > 0:
+            size += game.font.get_kerning(ord(s[i-1]), code, char_size)
+    return size
+    
+def wrapText(width, s, char_size, is_bold=False):
+    parts = s.split(" ")
+    wrapped = []
+    size = 0
+    line = []
+    for sub_s in parts:
+        w = getTextSize(sub_s+" ", char_size, is_bold)
+        size += w
+        if size > width:
+            wrapped.append( " ".join(line) )
+            size = w
+            line = []
+        line.append(sub_s)
+    if len(line) > 0:
+        wrapped.append( " ".join(line) )
+    return wrapped    
+ 
 class GUIText(sf.Drawable):
     #perhaps implement this inheriting from sf.Text instead of encapsulating it?
     HOR_LEFT = 0
@@ -264,152 +398,26 @@ class PlayerHUD(sf.Drawable):
             target.draw(icon, staout)
             target.draw(text)
         
-def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
-    target = None
-    min_dist = game.Game.track_area.squaredLen()
-    for i in xrange(1, len(game.Game.entities)):
-        ent = game.Game.entities[i]
-        if ent.hp <= 0 or not ent.type in validTargets:
-            continue
-        dist = ent.center() - point
-        if dist.squaredLen() < min_dist: #yay raizes desnecessarias!
-            min_dist = dist.squaredLen()
-            target = ent
-    return target
+class TextEntry(sf.Drawable):
+    def __init__(self, s, rect, charSize=20, textColor=sf.Color.WHITE, backColor=sf.Color(0,0,0,180), outlineThickness=3, outlineColor=sf.Color.BLUE, cursorColor=sf.Color.WHITE):
+        sf.Drawable.__init__(self)
+        self.input_area = sf.RectangleShape(rect.size)
+        self.input_area.position = rect.position
+        self.input_area.fill_color = backColor
+        self.input_area.outline_thickness = outlineThickness
+        self.input_area.outline_color = outlineColor
+        self.txtui = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+8), GUIText.HOR_LEFT, textColor, charSize)
+        self.cursor = sf.RectangleShape((2, charSize))
+        self.cursor.fill_color = cursorColor
+        self.line = s
+        self.line_index = len(s)
         
-def createPointMark(pos, radius, color):
-    circle_res = 16 #in line segments
-    mark = sf.VertexArray(sf.PrimitiveType.LINES, 2*(2+circle_res))
-    circle_points = []
-    angle_step = 2 * pi / circle_res
-    angle = 0.0
-    for i in xrange(circle_res):
-        dir = sf.Vector2(cos(angle), sin(angle))
-        p = dir*radius
-        circle_points.append(p)
-        circle_points.append(p)
-        angle += angle_step
-    circle_points.append(circle_points.pop(0))
-    for i in xrange(circle_res*2):
-        mark[i].position = circle_points[i]
-        mark[i].color = color
-        
-    cross = [sf.Vector2(radius, 0), #left
-             sf.Vector2(-radius, 0), #right
-             sf.Vector2(0, radius), #top
-             sf.Vector2(0, -radius)] #bottom
-    for i in xrange(4):
-        mark[circle_res*2 + i].position = cross[i]
-        mark[circle_res*2 + i].color = color
-    return mark
-    
-def getLineEquation(p1, p2):
-    A = p2.y - p1.y
-    B = p1.x - p2.x
-    C = p2.x * p1.y - p1.x * p2.y
-    def f(p):
-        return A*p.x + B*p.y + C
-    return f
-    
-RaycastEntry = namedtuple("RaycastEntry", "distance entity")
-def raycastQuery(point, dir, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
-    hits = []
-    if dir.x == 0 and dir.y == 0:
-        return hits
-        
-    endPoint = point + dir*game.Game.track_area.len()
-    eq = getLineEquation(point, endPoint)
-    def onWhichSide(p):
-        v = eq(p)
-        if v != 0:
-            return v / abs(v)
-        return 0
-    
-    for i in xrange(len(game.Game.entities)):
-        ent = game.Game.entities[i]
-        if ent.hp <= 0 or not ent.type in validTargets:
-            continue
-        dist = ent.center() - point
-        if abs(dir.angleBetween(dist)) > math.pi/2:
-            continue
-        verts = ent.vertices()
-        sides = [onWhichSide(p) for p in verts]
-        #print "%s %i has sides: [%i,%i,%i,%i] (sum = %s) verts=%s" % (ent.type, ent.ID, sides[0], sides[1], sides[2], sides[3], sum(sides), verts)
-        if abs(sum(sides)) < 4:
-            hits.append( RaycastEntry(dist.len(), ent) )
-            
-    def comp(a,b):
-        v = int(a.distance - b.distance)
-        if v != 0:
-            return v / abs(v)
-        return 0
-    hits.sort(comp)
-            
-    return hits
-    
-def coneQuery(point, dir, angle, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
-    hits = []
-    if dir.x == 0 and dir.y == 0:
-        return hits
-    
-    for i in xrange(len(game.Game.entities)):
-        ent = game.Game.entities[i]
-        if ent.hp <= 0 or not ent.type in validTargets:
-            continue
-        dist = ent.center() - point
-        if abs(dir.angleBetween(dist)) > angle:
-            continue
-        hits.append( RaycastEntry(dist.len(), ent) )
-            
-    def comp(a,b):
-        v = int(a.distance - b.distance)
-        if v != 0:
-            return v / abs(v)
-        return 0
-    hits.sort(comp)
-            
-    return hits
-
-def getTextSize(s, char_size, is_bold=False):
-    size = 0
-    for i, c in enumerate(s):
-        code = ord(c)
-        size += game.font.get_glyph(code, char_size, is_bold).advance
-        if i > 0:
-            size += game.font.get_kerning(ord(s[i-1]), code, char_size)
-    return size
-    
-def wrapText(width, s, char_size, is_bold=False):
-    parts = s.split(" ")
-    wrapped = []
-    size = 0
-    line = []
-    for sub_s in parts:
-        w = getTextSize(sub_s+" ", char_size, is_bold)
-        size += w
-        if size > width:
-            wrapped.append( " ".join(line) )
-            size = w
-            line = []
-        line.append(sub_s)
-    if len(line) > 0:
-        wrapped.append( " ".join(line) )
-    return wrapped    
- 
-################################################################
-# Console
-class Console(object,code.InteractiveConsole):
-    def __init__(self, locals={}):
-        code.InteractiveConsole.__init__(self, dict(globals().items() + locals.items()), "__console__")
-        self.open = False
-        self.initialized = False
-        self.outputs = []
-        self.output_index = 0
-        self.log = []
-        self.log_index = 0
-        self.line = ""
-        self._lineindex = 0
-        self.stdout = sys.stdout
+    @property
+    def position(self):
+        return self.txtui.position
+    @position.setter
+    def position(self, pos):
+        self.txtui.position = pos
         
     @property
     def line_index(self):
@@ -421,46 +429,25 @@ class Console(object,code.InteractiveConsole):
             self._lineindex = 0
         if self._lineindex > len(self.line):
             self._lineindex = len(self.line)
-        size = getTextSize(self.line[:self._lineindex], self.input.txt.character_size, game.Game.font)
-        self.cursor.position = self.input.position.x + size - 2, self.input.position.y
-       
-    def initGraphics(self, rect):
-        if self.initialized:    return
-        self.initialized = True
-        self.output_area = sf.RectangleShape(rect.size)
-        self.output_area.position = rect.position
-        self.output_area.fill_color = sf.Color(0,0,0,180)
-        self.output_area.outline_thickness = 3
-        self.output_area.outline_color = sf.Color.GREEN
-        self.input_area = sf.RectangleShape((rect.width, 33))
-        self.input_area.position = rect.left, self.output_area.global_bounds.bottom
-        self.input_area.fill_color = sf.Color(0,0,0,180)
-        self.input_area.outline_thickness = 3
-        self.input_area.outline_color = sf.Color.BLUE
-        self.input = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+8), GUIText.HOR_LEFT, sf.Color.WHITE, 20)
-        self.cursor = sf.RectangleShape((2, 20))
-        self.cursor.fill_color = sf.Color.WHITE
-        self.cursor.position = self.input.position
-        self.scrollbar = sf.RectangleShape((5, self.output_area.size.y))
-        self.scrollbar.fill_color = sf.Color.RED
-        self.scrollbar.position = rect.right-self.scrollbar.size.x, rect.top
-        self.output_char_size = 12  
-        self.num_outputs = int( (self.output_area.local_bounds.height - 16) / self.output_char_size )
+        size = getTextSize(self.line[:self._lineindex], self.txtui.txt.character_size)
+        self.cursor.position = self.position.x + size - 2, self.position.y
         
+    @property
+    def text(self):
+        return self.line
+    @text.setter
+    def text(self, s):
+        self.line = s
+        self.line_index = len(s)
+    
     def processInput(self, e):
-        if type(e) == sf.TextEvent and self.open:
+        if type(e) == sf.TextEvent:
             # So ENTER(13)/BACKSPACE(8)/TAB(9) aparentemente podem vir aqui.
             if e.unicode == ord('\r') or e.unicode == ord('\n'): #ENTER \n ou \r
-                if len(self.line) > 0:
-                    self.log.insert(0, self.line)
-                    try:
-                        self.addOutput("$ "+self.line, sf.Color(180,180,255,255))
-                        incomplete = self.push(self.line)
-                    except:
-                        traceback.print_exc(file=sys.stderr)
-                    self.line = ""
-                    self.line_index = 0
-                    self.log_index = 0
+                #if len(self.line) > 0:
+                #    self.line = ""
+                #    self.line_index = 0
+                pass #TODO: for now, do nothing on enter here (just prevent it from turning into char in text)
             elif e.unicode == ord('\b'): #BACKSPACE   \b
                 if len(self.line) > 0:
                     self.line = self.line[:self.line_index-1] + self.line[self.line_index:]
@@ -473,42 +460,88 @@ class Console(object,code.InteractiveConsole):
                     self.line_index += 1
                 except:
                     traceback.print_exc(file=sys.stderr)
+        elif type(e) == sf.KeyEvent and e.released:
+            if e.code == sf.Keyboard.LEFT:
+                self.line_index -= 1
+            elif e.code == sf.Keyboard.RIGHT:
+                self.line_index += 1
+            elif e.code == sf.Keyboard.DELETE:
+                if len(self.line) > 0:
+                    self.line = self.line[:self.line_index] + self.line[self.line_index+1:]
+            elif e.code == sf.Keyboard.HOME:
+                self.line_index = 0
+            elif e.code == sf.Keyboard.END:
+                self.line_index = len(self.line)
+            
+    def draw(self, target, states):
+        target.draw(self.input_area, states)
+        self.txtui.set_text(self.line)
+        target.draw(self.txtui, states)
+        target.draw(self.cursor, states)
+    
+################################################################
+# Console
+class Console(object,code.InteractiveConsole):
+    def __init__(self, locals={}):
+        code.InteractiveConsole.__init__(self, dict(globals().items() + locals.items()), "__console__")
+        self.open = False
+        self.initialized = False
+        self.outputs = []
+        self.output_index = 0
+        self.log = []
+        self.log_index = 0
+        self.stdout = sys.stdout
+        
+    def initGraphics(self, rect):
+        if self.initialized:    return
+        self.initialized = True
+        self.output_area = sf.RectangleShape(rect.size)
+        self.output_area.position = rect.position
+        self.output_area.fill_color = sf.Color(0,0,0,180)
+        self.output_area.outline_thickness = 3
+        self.output_area.outline_color = sf.Color.GREEN
+        self.input = TextEntry("", sf.Rectangle((rect.left, self.output_area.global_bounds.bottom), (rect.width, 33)),
+                                20, sf.Color.WHITE, sf.Color(0,0,0,180), 3, sf.Color.BLUE, sf.Color.WHITE)
+        self.scrollbar = sf.RectangleShape((5, self.output_area.size.y))
+        self.scrollbar.fill_color = sf.Color.RED
+        self.scrollbar.position = rect.right-self.scrollbar.size.x, rect.top
+        self.output_char_size = 12  
+        self.num_outputs = int( (self.output_area.local_bounds.height - 16) / self.output_char_size )
+        
+    def processInput(self, e):
+        if type(e) == sf.TextEvent and self.open:
+            # So ENTER(13)/BACKSPACE(8)/TAB(9) aparentemente podem vir aqui.
+            if e.unicode == ord('\r') or e.unicode == ord('\n'): #ENTER \n ou \r
+                if len(self.input.text) > 0:
+                    self.log.insert(0, self.input.text)
+                try:
+                    self.addOutput("$ "+self.input.text, sf.Color(180,180,255,255))
+                    incomplete = self.push(self.input.text)
+                except:
+                    traceback.print_exc(file=sys.stderr)
+                self.input.text = ""
+                self.log_index = 0
         elif type(e) == sf.KeyEvent:
             if e.code == sf.Keyboard.TAB and e.control and e.released:
                 self.open = not self.open
             elif self.open and e.released:
-                if e.code == sf.Keyboard.LEFT:
-                    self.line_index -= 1
-                elif e.code == sf.Keyboard.RIGHT:
-                    self.line_index += 1
-                elif e.code == sf.Keyboard.UP:
+                if e.code == sf.Keyboard.UP:
                     self.log_index += 1
                     li = self.log_index - 1
                     if 0 <= li < len(self.log):
-                        self.line = self.log[li]
-                        self.line_index = len(self.line)
+                        self.input.text = self.log[li]
                     elif li >= len(self.log):
                         self.log_index = len(self.log)
                         if len(self.log) > 0:
-                            self.line = self.log[self.log_index-1]
-                            self.line_index = len(self.line)
+                            self.input.text = self.log[self.log_index-1]
                 elif e.code == sf.Keyboard.DOWN:
                     self.log_index -= 1
                     li = self.log_index - 1
                     if 0 <= li < len(self.log):
-                        self.line = self.log[li]
-                        self.line_index = len(self.line)
+                        self.input.text = self.log[li]
                     elif li < 0:
                         self.log_index = 0
-                        self.line = ""
-                        self.line_index = 0
-                elif e.code == sf.Keyboard.DELETE:
-                    if len(self.line) > 0:
-                        self.line = self.line[:self.line_index] + self.line[self.line_index+1:]
-                elif e.code == sf.Keyboard.HOME:
-                    self.line_index = 0
-                elif e.code == sf.Keyboard.END:
-                    self.line_index = len(self.line)
+                        self.input.text = ""
             elif self.open and e.code == sf.Keyboard.PAGE_UP:
                 self.output_index -= 1
                 if self.output_index < 0:
@@ -523,7 +556,10 @@ class Console(object,code.InteractiveConsole):
                 self.output_index = len(self.outputs) - self.num_outputs
             if self.output_index < 0:
                 self.output_index = 0
-                
+               
+        if self.open:
+            self.input.processInput(e)
+            
     def push(self, line):
         ### OVERWRITING InteractiveConsole.push to print stuff to graphical console
         sys.stdout = self
@@ -568,7 +604,6 @@ class Console(object,code.InteractiveConsole):
     def draw(self, window):
         if not self.open:   return
         window.draw(self.output_area)
-        window.draw(self.input_area)
         self.drawOutputs(window)
         if len(self.outputs) > 0:
             self.scrollbar.position = self.scrollbar.position.x, self.output_area.position.y + self.output_area.size.y * self.output_index / len(self.outputs)
@@ -577,9 +612,7 @@ class Console(object,code.InteractiveConsole):
                 bar_h = self.output_area.size.y
             self.scrollbar.size = self.scrollbar.size.x, bar_h
         window.draw(self.scrollbar)
-        self.input.set_text(self.line)
         window.draw(self.input)
-        window.draw(self.cursor)
     
 ################################################################
 # Fix for SFML bug

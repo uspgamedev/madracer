@@ -6,6 +6,12 @@ import random, math
 import pickle
 from collections import namedtuple
 
+try:
+    font = sf.Font.from_file("arial.ttf")
+except IOError: 
+    print "ERROR: can't load font"
+    exit(1)
+
 HighscoreEntry = namedtuple("HighscoreEntry", "name points level")
 AnimationData = namedtuple("AnimationData", "tex rows cols num_frames fps sw sh")
 class EntityGenerator:
@@ -207,13 +213,13 @@ class Game:
             EntityGenerator('rigs', [60.0, 60.0], [('warrig',1.0)], lambda: round(Game.speed_level) - 1)
         ]
         self.console = Console({'game': self})
+        self.console.initGraphics(sf.Rectangle((100, 3), (800, 700/2)) )
         
     def initialize(self, window, font, cheatsEnabled, stretchView, superhot):
         self.window = window
         self.font = font
         self.entities = []
         self.effects = []
-        self.console.initGraphics(sf.Rectangle((100, 3), (800, 700/2)) )
         self.input = input.available_inputs[self.input_index]()
         if not self.input.valid():
             self.changeInput(False)

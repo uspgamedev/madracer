@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sfml as sf
-from scripts.game import Game, input
+from scripts.game import Game, input, font
 
 ################################################################
 
@@ -14,12 +14,6 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
     else:
         windowsize = (1000, 700)
         window = sf.RenderWindow(sf.VideoMode(*windowsize), windowtitle)
-    
-    try:
-        font = sf.Font.from_file("arial.ttf")
-    except IOError: 
-        print "error"
-        exit(1)
     
     Game.input_index = input_index
     Game.initialize(window, font, cheatsEnabled, stretch, superhot)

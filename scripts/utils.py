@@ -103,7 +103,7 @@ class GUIText(sf.Drawable):
     HOR_LEFT_VER_CENTER = 4
     def __init__(self, txt, pos, align=HOR_LEFT, color=sf.Color.BLACK, size=20):
         sf.Drawable.__init__(self)
-        self.txt = sf.Text(txt, game.Game.font, character_size=size)
+        self.txt = sf.Text(txt, game.font, character_size=size)
         self.txt.color = color
         if type(pos) == type([]) or type(pos) == type(()):
             self.txt.position = pos
@@ -211,13 +211,13 @@ class PlayerHUD(sf.Drawable):
         self.texts = []
         char_size = 18.0
         self.icons.append(sf.Sprite(game.Game.images.ammo))
-        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.texts.append(sf.Text("", game.font, character_size=char_size))
         self.icons.append(sf.Sprite(game.Game.images.bomb))
-        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.texts.append(sf.Text("", game.font, character_size=char_size))
         self.icons.append(sf.Sprite(game.Game.images.speed))
-        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.texts.append(sf.Text("", game.font, character_size=char_size))
         self.icons.append(sf.Sprite(game.Game.images.points))
-        self.texts.append(sf.Text("", game.Game.font, character_size=char_size))
+        self.texts.append(sf.Text("", game.font, character_size=char_size))
         yoff = 0
         for icon, text in zip(self.icons, self.texts):
             text.color = sf.Color.WHITE
@@ -374,28 +374,11 @@ def getTextSize(s, char_size, is_bold=False):
     size = 0
     for i, c in enumerate(s):
         code = ord(c)
-        size += game.Game.font.get_glyph(code, char_size, is_bold).advance
+        size += game.font.get_glyph(code, char_size, is_bold).advance
         if i > 0:
-            size += game.Game.font.get_kerning(ord(s[i-1]), code, char_size)
+            size += game.font.get_kerning(ord(s[i-1]), code, char_size)
     return size
     
-def wrapText2(width, s, char_size, is_bold=False, lineBreakers=[' ', '\t']):
-    size = 0
-    wrapped = []
-    line_start = 0
-    last_whitespace_index = 0
-    for i, c in enumerate(s):
-        code = ord(c)
-        if c in lineBreakers:
-            last_whitespace_index = i
-        size += Game.font.get_glyph(code, char_size, is_bold).advance
-        if i > 0:
-            size += Game.font.get_kerning(ord(s[i-1]), code, char_size)
-        if size > width and last_whitespace_index > 0:
-            wrapped.append( s )
-            
-    return wrapped
-
 def wrapText(width, s, char_size, is_bold=False):
     parts = s.split(" ")
     wrapped = []
@@ -565,7 +548,7 @@ class Console(object,code.InteractiveConsole):
             wraps = wrapText(self.output_area.local_bounds.width - 5, out, self.output_char_size)
             for s in wraps:
                 txt = sf.Text()
-                txt = sf.Text(s, game.Game.font, character_size=self.output_char_size)
+                txt = sf.Text(s, game.font, character_size=self.output_char_size)
                 txt.color = color
                 self.outputs.append(txt)
                 if len(self.outputs) - self.output_index > self.num_outputs:

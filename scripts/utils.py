@@ -94,10 +94,13 @@ class Turret:
 def isInArray(value, array):
     return value in array
 
+def windowDiag():
+    return game.Game.window.view.size.x**2+game.Game.window.view.size.y**2
+    
 def getEntClosestTo(point, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
     target = None
-    min_dist = game.Game.track_area.squaredLen()
-    for i in xrange(1, len(game.Game.entities)):
+    min_dist = windowDiag()
+    for i in xrange(len(game.Game.entities)):
         ent = game.Game.entities[i]
         if ent.hp <= 0 or not ent.type in validTargets:
             continue
@@ -147,7 +150,7 @@ def raycastQuery(point, dir, validTargets = ['berserker', 'slinger', 'warrig', '
     if dir.x == 0 and dir.y == 0:
         return hits
         
-    endPoint = point + dir*game.Game.track_area.len()
+    endPoint = point + (dir * math.sqrt(windowDiag()))
     eq = getLineEquation(point, endPoint)
     def onWhichSide(p):
         v = eq(p)
@@ -381,7 +384,7 @@ class PlayerHUD(sf.Drawable):
         self._pos = p
         
     def update(self, dt):
-        mins, secs = game.Game.getTimeFromSpeedLevel(game.Game.speed_level)
+        mins, secs = game.Game.getTimeFromSpeedLevel(self.player.speed_level)
         playerValues = ("%i/%i" % (self.player.shots_available, self.player.max_shots),
                         "%i" % self.player.bombs,
                         "%im%is" % (mins, secs),
@@ -581,7 +584,7 @@ class Console(object,code.InteractiveConsole):
     def addOutput(self, out, color=sf.Color.WHITE):
         fullout = str(out.encode("ascii", "ignore"))
         for out in fullout.split("\n"):
-            wraps = wrapText(self.output_area.local_bounds.width - 5, out, self.output_char_size)
+            wraps = wrapText(self.output_area.global_bounds.width - 5, out, self.output_char_size)
             for s in wraps:
                 txt = sf.Text()
                 txt = sf.Text(s, game.font, character_size=self.output_char_size)

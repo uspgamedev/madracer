@@ -14,7 +14,7 @@ class PowerUp(BaseEntity):
         BaseEntity.__init__(self, 'powerup', x, y, 30, 30, 'green', 5.0, 1, 0)
         self.dir = Vector(0, 1)
         self.show_life_bar = False
-        self.was_picked_up = False
+        self.was_picked_up = None
         self.onPickup = action
         #self.considers_game_speed = True
 
@@ -25,12 +25,12 @@ class PowerUp(BaseEntity):
     def collidedWith(self, ent):
         if ent.type != 'player':
             return
-        self.was_picked_up = True
+        self.was_picked_up = ent
         self.hp = -1
 
     def onDeath(self):
-        if self.was_picked_up:
-            self.onPickup()
+        if self.was_picked_up != None:
+            self.onPickup(self.was_picked_up)
             self.point_value = 50
 #end class PowerUp
 
@@ -55,12 +55,12 @@ def RandomizePowerUp(pos, chanceToCreate):
     return None
         
 #********************** POWER UP TABLE ******************
-def hpupAction():
-    Game.player.hp += 150
-    if Game.player.hp > Game.player.max_hp:
-        Game.player.hp = Game.player.max_hp
-def bombupAction():
-    Game.player.bombs += 1
+def hpupAction(player):
+    player.hp += 150
+    if player.hp > player.max_hp:
+        player.hp = player.max_hp
+def bombupAction(player):
+    player.bombs += 1
 
 PowerUpData = namedtuple("PowerUpData", "name chance image action")
 

@@ -22,6 +22,7 @@ class EntityGenerator:
         self.number = number
         self.time_to_create = 0.0
 
+##############################################################
 class TextureManager:
     def __init__(self):
         self.explosion1 = sf.Texture.from_file("images/explosion1.png")
@@ -89,7 +90,7 @@ class SoundManager:
     def playSound(self, sound, pos=None):
         s = sf.Sound(sound)
         if pos != None:
-            sp = (pos - Game.track_pos) - (Game.player.pos - Game.track_pos)
+            sp = (pos - Game.track_pos) #- (Game.player.pos - Game.track_pos)
             sp = (sp / Game.track_area)*100
             s.position = (sp.x, sp.y, 0)
             s.attenuation = 0.5
@@ -118,6 +119,7 @@ class SoundManager:
         for s in toremove:
             self.sounds.remove(s)
 
+##############################################################
 class HighScores(sf.Drawable):
     def __init__(self):
         sf.Drawable.__init__(self)
@@ -176,48 +178,66 @@ class HighScores(sf.Drawable):
         for text in self.texts:
             target.draw(text, states)
             
+###############################################################
+# GAME STATES
 class GameState(sf.Drawable):
     def __init__(self):
         sf.Drawable.__init__(self)
+        self.stacktop_draw = False
+        self.entities = [] #POG pra o Game poder pegar lista de entidades sem ter q testar q State que eh
         
-    def update(self, dt):
+    def pushToGame(self):
+        Game.states.append(self)
+        
+    def onPopFromGame(self):
         pass
+        
+    # if return False, state is deleted from Game.
+    def update(self, dt):
+        return True
         
     def processInput(self, e):
         pass
         
     def draw(self, target, states):
         pass
+        
+    def getWindowImage(self):
+        ssTex = sf.RenderTexture(Game.window.view.size.x, Game.window.view.size.y)
+        ssTex.active = True
+        #self.InitOpenGLContext(ssTex)
+        ssTex.clear()
+        #self.screenshotting = renderMode
+        ssTex.draw(self)
+        #self.screenshotting = 0
+        ssTex.display()
+        Game.window.active = True
+        #self.InitOpenGLContext(self.window)
+        return ssTex
         
 class LocalGame(GameState):
-    def __init__(self, player):
-        GameState.__init__(self)
-        self.player = player
-        
-    def update(self, dt):
-        pass
-        
-    def processInput(self, e):
-        pass
-        
-    def draw(self, target, states):
-        pass
-    
-################################################################
-class Game:
-    fps = 30.0
-    
-    highscores = HighScores()
-    
-    images = TextureManager()
-    animations = AnimationManager(images)
-    sounds = SoundManager()
-
     def __init__(self):
-        pass
-    def build(self):
-        self.track_pos = Vector(100, 0)
-        self.track_area = Vector(800, 700)
+        GameState.__init__(self)
+        self.entities = []
+        self.effects = []
+        BaseEntity.entCount = 0
+        self.speed_level = 1.0
+        self.track = sf.Sprite(Game.images.track)
+        self.track.position = Game.track_pos.x, -2100
+        self.music = sf.Music.from_file('sounds/music.ogg')
+        self.music.play()
+        self.music.loop = True
+        self.music.volume = 80
+        sf.Listener.set_direction((0,1,0))
+        
+        self.paused = False
+        self.cheated = False
+        self.generate_entities = True
+        
+        self.player = Player(400, 400, "Placeholder", 0)
+        self.initGraphics()
+        self.entities.append(self.player)
+
         def powerupFactory(x,y):
             return RandomizePowerUp(Vector(x,y), 1.0)
         self.entityFactory = {
@@ -229,59 +249,23 @@ class Game:
             'powerup': powerupFactory,
             }
         self.generators = [
-            EntityGenerator('obstacles', [10.0, 50.0], [('quicksand',0.6), ('rock',0.4)], lambda: round(Game.speed_level)),
+            EntityGenerator('obstacles', [10.0, 50.0], [('quicksand',0.6), ('rock',0.4)], lambda: round(Game.states[-1].speed_level)),
             EntityGenerator('obstaclesSimple', [1.0, 5.0], [('rock',1.0)], lambda: 1),
-            EntityGenerator('powerups', [10.0, 50.0], [('powerup',1.0)], lambda: round(Game.speed_level)),
-            EntityGenerator('berserkers', [1.0, 5.0], [('berserker',1.0)], lambda: round(Game.speed_level)),
-            EntityGenerator('slingers', [2.0, 8.0], [('slinger',1.0)], lambda: round(Game.speed_level)),
-            EntityGenerator('enemiesSimple', [2.0, 12.0], [('berserker',0.6), ('slinger',0.4)], lambda: 2*math.floor(Game.speed_level)),
-            EntityGenerator('allenemies', [10.0, 30.0], [('berserker',0.4), ('slinger',0.4), ('warrig',0.2)], lambda: 2*math.floor(Game.speed_level)),
-            EntityGenerator('rigs', [60.0, 60.0], [('warrig',1.0)], lambda: round(Game.speed_level) - 1)
+            EntityGenerator('powerups', [10.0, 50.0], [('powerup',1.0)], lambda: round(Game.states[-1].speed_level)),
+            EntityGenerator('berserkers', [1.0, 5.0], [('berserker',1.0)], lambda: round(Game.states[-1].speed_level)),
+            EntityGenerator('slingers', [2.0, 8.0], [('slinger',1.0)], lambda: round(Game.states[-1].speed_level)),
+            EntityGenerator('enemiesSimple', [2.0, 12.0], [('berserker',0.6), ('slinger',0.4)], lambda: 2*math.floor(Game.states[-1].speed_level)),
+            EntityGenerator('allenemies', [10.0, 30.0], [('berserker',0.4), ('slinger',0.4), ('warrig',0.2)], lambda: 2*math.floor(Game.states[-1].speed_level)),
+            EntityGenerator('rigs', [60.0, 60.0], [('warrig',1.0)], lambda: round(Game.states[-1].speed_level) - 1)
         ]
-        self.console = Console({'game': self})
-        self.console.initGraphics(sf.Rectangle((100, 3), (800, 700/2)) )
-        
-    def initialize(self, window, font, cheatsEnabled, stretchView, superhot):
-        self.window = window
-        self.font = font
-        self.entities = []
-        self.effects = []
-        self.superhot = superhot
-        
-        self.entCount = 0
-        self.cont = True
-        self.speed_level = 1.0
-        self.track = sf.Sprite(self.images.track)
-        self.track.position = self.track_pos.x, -2100
-        self.delta_time = 1.0/self.fps
-        self.actual_fps = self.fps
-        self.music = sf.Music.from_file('sounds/music.ogg')
-        self.music.play()
-        self.music.loop = True
-        self.music.volume = 80
-        sf.Listener.set_direction((0,1,0))
-        
-        self.paused = False
-        self.cheats_enabled = cheatsEnabled
-        self.cheated = False
-        self.generate_entities = True
-        
-        self.stretchView = stretchView
-        self.player = Player(400, 400, "hue", 0)
-        self.updateGraphics()
-        self.initGraphics()
-        self.player_name = []
-        self.entities.append(self.player)
-        
         for gen in self.generators:
             gen.time_to_create = (gen.interval[1] - gen.interval[0])*random.random() + gen.interval[0]
-        
-        self.clock = sf.Clock()
-        self.clock.restart()
+            
+        self.pause_screen = PauseScreen()
         
     def initGraphics(self):
-        barWidth = self.track_pos.x
-        width, height = self.window.view.size
+        barWidth = Game.track_pos.x
+        width, height = Game.window.view.size
         
         def createBar(x, w, color):
             bar = sf.RectangleShape((w, height))
@@ -290,122 +274,22 @@ class Game:
             return bar
         self.side_bars = [
             createBar(0, barWidth, sf.Color.BLACK),
-            createBar(self.track_pos.x+self.track_area.x, barWidth, sf.Color.BLACK),
-            createBar(self.track_pos.x-3, 3, sf.graphics.Color(112,112,112,255)),
-            createBar(self.track_pos.x+self.track_area.x, 3, sf.graphics.Color(112,112,112,255)),
-            createBar(self.track_pos.x-6, 3, sf.graphics.Color(112,0,0,255)),
-            createBar(self.track_pos.x+self.track_area.x+3, 3, sf.graphics.Color(112,0,0,255))]
-        
-        hsCor = sf.graphics.Color(160,160,0,255)
-                    
-        self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
-        self.pausedTxt.txt.style = sf.Text.BOLD
-        self.pausedTxt.outline_color = sf.Color.RED
-        self.pausedTxt.outline_thickness = 1
-        
-        self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
-        self.gameOverTxt.txt.style = sf.Text.BOLD
-        self.gameOverTxt.outline_color = sf.Color.RED
-        self.gameOverTxt.outline_thickness = 1
-        
-        restxt = "Type in highscore name (max 8 chars):\n\n\nPress ENTER to start a new game."
-        self.restartTxt = GUIText(restxt, (width/2, height/2 + 40), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
-        self.restartTxt.txt.style = sf.Text.BOLD
-        self.restartTxt.outline_color = sf.Color.RED
-        self.restartTxt.outline_thickness = 1
-        
-        self.plaNameTxt = GUIText("-", (width/2, height/2 + 70), GUIText.HOR_CENTER, sf.Color.BLACK, 30)
-        self.plaNameTxt.txt.style = sf.Text.BOLD
-        self.plaNameTxt.outline_color = sf.Color.RED
-        self.plaNameTxt.outline_thickness = 1
-        
-    def updateGraphics(self):
-        #to be executed when window changes size (ex.: change fullscreen status
-        self.window.view = sf.View((0,0,1000,700))
-        orisize = Vector(1000,700)
-        if not self.stretchView:
-            if self.window.width/orisize.x > self.window.height/orisize.y:
-                # eixo Y eh o base
-                ww = self.window.height * orisize.x / orisize.y
-                ww = ww / self.window.width
-                self.window.view.viewport = ((1.0 - ww)/2, 0.0, ww, 1.0)
-            else:
-                # eixo X eh o base
-                hh = self.window.width * orisize.y / orisize.x
-                hh = hh / self.window.height
-                self.window.view.viewport = (0.0, (1.0 - hh)/2, 1.0, hh)
-        
-    def getIDfor(self, ent):
-        self.entCount += 1
-        return self.entCount
-    
-    def getTimeFromSpeedLevel(self, speedLvl):
-        mins = speedLvl - 1
-        secs = mins*60 - int(mins)*60
-        mins = int(mins)
-        return mins, secs
-    
-    ####### DRAW
-    def draw(self):
-        tpy = self.track.position.y
-        if tpy > 0:
-            topHalfY = tpy - self.track.texture.height
-            self.track.position = self.track_pos.x, topHalfY
-            self.window.draw(self.track)
-            self.track.position = self.track_pos.x, tpy
-        self.window.draw(self.track)
-        
-        for bar in self.side_bars:
-            self.window.draw(bar)
-        
-        #draw elements
-        for ent in self.entities:
-            ent.draw(self.window)
-        
-        #draw effects
-        for eff in self.effects:
-            self.window.draw(eff)
-        
-        # gotta do this separately to ensure player's UI are on top of entities and effects
-        self.player.drawUI(self.window)
+            createBar(Game.track_pos.x+Game.track_area.x, barWidth, sf.Color.BLACK),
+            createBar(Game.track_pos.x-3, 3, sf.graphics.Color(112,112,112,255)),
+            createBar(Game.track_pos.x+Game.track_area.x, 3, sf.graphics.Color(112,112,112,255)),
+            createBar(Game.track_pos.x-6, 3, sf.graphics.Color(112,0,0,255)),
+            createBar(Game.track_pos.x+Game.track_area.x+3, 3, sf.graphics.Color(112,0,0,255))]
                 
-        if self.player.hp <= 0:
-            self.window.draw(self.highscores)
-            self.window.draw(self.gameOverTxt)
-            if self.cheated:
-                self.restartTxt.set_text("Press ENTER to start a new game.\nCheating disables highscores.")
-            elif self.highscores.getHSindex(self.player.points) >= 0:
-                self.plaNameTxt.set_text("".join(self.player_name))
-                self.window.draw(self.plaNameTxt)
-            else:
-                self.restartTxt.set_text("Press ENTER to start a new game.")
-            self.window.draw(self.restartTxt)
-        else:
-            if self.paused:
-                self.window.draw(self.pausedTxt)
-                self.window.draw(self.highscores)
-                
-        self.console.draw(self.window)
-        
-    ####### UPDATE
-    def update(self):
-        ### debugging feature to run SUPER!HOT! (frame-per-frame)
-        if not self.cont and self.superhot: 
-            return
-        self.cont = False
-
-        elapsed = self.clock.restart()
-        self.actual_fps = 1.0/elapsed.seconds
-        
-        dt = elapsed.seconds #1.0 / self.fps
-        self.delta_time = dt
-        
-        self.sounds.update()
-        
-        if self.player.hp > 0 and not self.paused and not self.console.open:
+    def update(self, dt):
+        if self.player.hp > 0 and not self.paused:
             # update game stats
             self.player.points += dt #+1 point per second
             self.speed_level += dt/60.0 #speed_level will increase by 1 each 60 secs
+            self.player.speed_level = self.speed_level
+            
+            listenerPos = self.player.center() - Game.track_pos
+            listenerPos = (listenerPos / Game.track_area)*100
+            sf.Listener.set_position((listenerPos.x,listenerPos.y,0))
             
             # generate new entities
             if self.generate_entities:
@@ -420,8 +304,8 @@ class Game:
                             cumulative = 0.0
                             for type, chance in gen.entities:
                                 if entIndex < chance + cumulative:
-                                    X = random.random()*self.track_area.x
-                                    newEnt = Game.entityFactory[type](X+self.track_pos.x, 0)                                        
+                                    X = random.random()*Game.track_area.x
+                                    newEnt = self.entityFactory[type](X+Game.track_pos.x, 0)                                        
                                     Y = -newEnt.size.y*0.85
                                     if random.random() < 0.25 and isInArray(type, possibleBottomEntTypes):
                                         Y = Game.track_area.y - newEnt.size.y*0.55
@@ -465,109 +349,288 @@ class Game:
                 if eff.destroyed:
                     self.effects.remove(eff)
             
-            self.track.position = self.track_pos.x, self.track.position.y + (self.speed_level + 5)
+            self.track.position = Game.track_pos.x, self.track.position.y + (self.speed_level + 5)
             if self.track.position.y > 700:
-                self.track.position = (self.track_pos.x, -2100)
-
-    ####### INPUT
+                self.track.position = (Game.track_pos.x, -2100)
+        elif self.player.hp <= 0:
+            return False
+        return True
+        
+    def onPopFromGame(self):
+        lastScreen = self.getWindowImage()
+        gameOver = GameOverScreen([self.player], self.cheated, lastScreen)
+        gameOver.pushToGame()
+        
     def processInput(self, e):
-        if self.cheats_enabled:
-            self.console.processInput(e)
-        if self.console.open:   return
-            
-        if type(e) is sf.FocusEvent:
-            self.pause(e.lost)
-            return
         self.player.input.processInput(e)
         
-        if type(e) is sf.TextEvent:
-            if self.player.hp <= 0:
-                if not e.unicode in [ord('\b'),ord('\n'),ord('\r')] and len(self.player_name) < 8: # any text char, except newline and backspace
-                    try:
-                        self.player_name.append( chr(e.unicode) )
-                    except:
-                        print "ERROR: Strange text key entered"
-        elif type(e) is sf.KeyEvent:
-            if e.code == sf.Keyboard.ESCAPE:
-                window.close();
-                return
-
-            self.cont = True
+        if type(e) is sf.FocusEvent and e.lost:
+            self.pause_screen.pushToGame(self.player)
+            return
+        if input.InputInterface.PAUSE in Game.loop_commands:
+            self.pause_screen.pushToGame(self.player)
+        
+        if type(e) is sf.KeyEvent:
             if not e.released:
                 if self.player.hp <= 0: return
-                if self.cheats_enabled:
+                if Game.cheats_enabled:
                     if e.code == sf.Keyboard.H and e.control:
                         self.player.hp = self.player.max_hp
                         self.cheated = True
                     elif e.code == sf.Keyboard.B and e.control:
                         self.player.bombs += 1
                         self.cheated = True
-                self.cont = True
-            else:
-                if self.player.hp <= 0:
-                    if e.code == sf.Keyboard.BACK_SPACE and len(self.a) > 0: #backspace
-                        self.eraseCharFromPlayerName()
-                    elif e.code == sf.Keyboard.RETURN: #enter
-                        self.startNewGame()
-                else:
-                    if self.cheats_enabled:
-                        if e.code == sf.Keyboard.T and e.control:
-                            self.entities.append( Berserker(200, 200) )
-                            self.cheated = True
-                        elif e.code == sf.Keyboard.Y and e.control:
-                            self.entities.append( Slinger(600, 200) )
-                            self.cheated = True
-                        elif e.code == sf.Keyboard.U and e.control:
-                            self.entities.append( WarRig(400, 160) )
-                            self.entities[-1].createTurrets()
-                            self.cheated = True
-                        elif e.code == sf.Keyboard.I and e.control:
-                            self.entities.append( Rock(random.random()*self.track_area.x, -30) )
-                            self.cheated = True
-                        elif e.code == sf.Keyboard.O and e.control:
-                            self.entities.append( QuickSand(random.random()*self.track_area.x, -20) )
-                            self.cheated = True
-                        elif e.code == sf.Keyboard.P and e.control:
-                            self.entities.append( Dummy(random.random()*self.track_area.x, random.random()*self.track_area.y) )
-                            self.cheated = True
-                        elif e.code == sf.Keyboard.G and e.control:
-                            self.generate_entities = not self.generate_entities
-                            self.cheated = True
-                        
-    def pause(self, forcePaused=None):
-        self.paused = (not self.paused) if (forcePaused == None) else (forcePaused)
-        if self.paused and self.player.hp > 0:
-            self.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
+            elif self.player.hp > 0:
+                if Game.cheats_enabled:
+                    if e.code == sf.Keyboard.T and e.control:
+                        self.entities.append( Berserker(200, 200) )
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.Y and e.control:
+                        self.entities.append( Slinger(600, 200) )
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.U and e.control:
+                        self.entities.append( WarRig(400, 160) )
+                        self.entities[-1].createTurrets()
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.I and e.control:
+                        self.entities.append( Rock(random.random()*Game.track_area.x, -30) )
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.O and e.control:
+                        self.entities.append( QuickSand(random.random()*Game.track_area.x, -20) )
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.P and e.control:
+                        self.entities.append( Dummy(random.random()*Game.track_area.x, random.random()*Game.track_area.y) )
+                        self.cheated = True
+                    elif e.code == sf.Keyboard.G and e.control:
+                        self.generate_entities = not self.generate_entities
+                        self.cheated = True
+  
+    def draw(self, target, states):
+        tpy = self.track.position.y
+        if tpy > 0:
+            topHalfY = tpy - self.track.texture.height
+            self.track.position = Game.track_pos.x, topHalfY
+            target.draw(self.track, states)
+            self.track.position = Game.track_pos.x, tpy
+        target.draw(self.track, states)
+        
+        for bar in self.side_bars:
+            target.draw(bar, states)
+        
+        #draw elements
+        for ent in self.entities:
+            ent.draw(target)
+        
+        #draw effects
+        for eff in self.effects:
+            target.draw(eff, states)
+        
+        # gotta do this separately to ensure player's UI are on top of entities and effects
+        self.player.drawUI(target)
+
+class PauseScreen(GameState):
+    def __init__(self):
+        GameState.__init__(self)
+        width, height = Game.window.view.size
+        self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
+        self.pausedTxt.txt.style = sf.Text.BOLD
+        self.pausedTxt.outline_color = sf.Color.RED
+        self.pausedTxt.outline_thickness = 1
+        
+    def pushToGame(self, player):
+        self.player = player
+        self.player.paused = True
+        Game.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
                                            sf.Color(0,0,0,180), 3)
-            self.player.input.updateGraphics(sf.Rectangle((680, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
+        self.player.input.updateGraphics(sf.Rectangle((680, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
                                       sf.Color(0,0,0,180), 3)
-        else:
-            self.player.input.disableGraphics()
+        GameState.pushToGame(self)
+        
+    def onPopFromGame(self):
+        self.player.input.disableGraphics()
+        
+    def update(self, dt):
+        return self.player.paused
+        
+    def processInput(self, e):
+        self.player.input.processInput(e)
+        if input.InputInterface.PAUSE in Game.loop_commands:
+            self.player.paused = False
+            Game.loop_commands.remove(input.InputInterface.PAUSE)
+        if type(e) is sf.FocusEvent:
+            self.player.paused = e.lost
+        
+    def draw(self, target, states):
+        target.draw(self.pausedTxt, states)
+        target.draw(Game.highscores, states)
 
-    def appendCharToPlayerName(self, c):
-        if len(self.player_name) < 8:
-            self.player_name.append( chr(e.unicode) )
-    def changePlayerNameChar(self, i, c):
-        if i < len(self.player_name):
-            self.player_name[i] = c
-        elif i == len(self.player_name) and len(self.player_name) < 8:
-            self.player_name.append(c)
-    def getPlayerNameChar(self, i):
-        if i < len(self.player_name):
-            return self.player_name[i]
-        return ''
-    def eraseCharFromPlayerName(self, index=-1):
-        if len(self.player_name) > 0:
-            if index < 0 or index >= len(self.player_name):
-                index = -1
-            self.player_name.pop(index)
-    def startNewGame(self):
-        if len(self.player_name) == 0:   
-            self.player_name = ['?']*5
+class GameOverScreen(GameState):
+    def __init__(self, players, cheated, GOSTex):
+        GameState.__init__(self)
+        self.active = True
+        self.players = players
+        self.cheated = cheated
+        self.gos_tex = GOSTex #GOSTex = GameOver Screen Texture
+        self.gos_spr = sf.Sprite(self.gos_tex.texture)
+        width, height = Game.window.view.size
+                
+        self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
+        self.gameOverTxt.txt.style = sf.Text.BOLD
+        self.gameOverTxt.outline_color = sf.Color.RED
+        self.gameOverTxt.outline_thickness = 1
+        
+        restxt = "Press ENTER to start a new game."
+        self.restartTxt = GUIText(restxt, (width/2, height/2 + 40), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
+        self.restartTxt.txt.style = sf.Text.BOLD
+        self.restartTxt.outline_color = sf.Color.RED
+        self.restartTxt.outline_thickness = 1
+        
+        Game.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, 
+                                       sf.graphics.Color(160,160,0,255), sf.Color.WHITE, sf.Color(0,0,0,180), 3)
+        
+    def onPopFromGame(self):
         if not self.cheated:
-            self.highscores.InsertScore("".join(self.player_name), round(self.player.points), self.speed_level)
-        self.initialize(self.window, self.font, self.cheats_enabled, self.stretchView, self.superhot)
+            Game.highscores.InsertScore(self.players[0].name, round(self.players[0].points), self.players[0].speed_level)
+        
+        #TODO: FIX THIS
+        # this should not be necessary with the main menu since it should be the base state in the stack, meaning it will 
+        # be shown again when this pops
+        state = LocalGame()
+        state.pushToGame()
+        
+        
+    def update(self, dt):
+        return self.active
+        
+    def processInput(self, e):
+        if type(e) == sf.KeyEvent and e.released:
+            if e.code == sf.Keyboard.RETURN: #enter
+                self.active = False
+        
+    def draw(self, target, states):
+        target.draw(self.gos_spr, states)
+        target.draw(Game.highscores, states)
+        target.draw(self.gameOverTxt, states)
+        hs_index = Game.highscores.getHSindex(self.players[0].points)
+        if self.cheated:
+            self.restartTxt.set_text("Press ENTER to start a new game.\nCheating disables highscores.")
+        elif hs_index >= 0:
+            self.restartTxt.set_text("Press ENTER to start a new game.\nEntered Highscores@%s!" % (hs_index))
+        target.draw(self.restartTxt, states)
+        
+################################################################
+class Game(object):
+    fps = 30.0
+    
+    highscores = HighScores()
+    
+    images = TextureManager()
+    animations = AnimationManager(images)
+    sounds = SoundManager()
 
+    def __init__(self):
+        pass
+    def build(self):
+        self.track_pos = Vector(100, 0)
+        self.track_area = Vector(800, 700)
+        self.loop_commands = []
+        self.console = Console({'game': self})
+        self.console.initGraphics(sf.Rectangle((100, 3), (800, 700/2)) )
+        
+    def initialize(self, window, font, cheatsEnabled, stretchView, superhot):
+        self.window = window
+        self.font = font
+        self.superhot = superhot
+        self.cont = True
+        self.actual_fps = self.fps
+        self.delta_time = 1.0/self.fps
+        self.cheats_enabled = cheatsEnabled
+        self.stretchView = stretchView
+        self.updateGraphics()
+        self.clock = sf.Clock()
+        self.clock.restart()
+        
+        self.states = [LocalGame()]
+        #aefdaefaef
+        
+    def updateGraphics(self):
+        #to be executed when window changes size (ex.: change fullscreen status
+        self.window.view = sf.View((0,0,1000,700))
+        orisize = Vector(1000,700)
+        if not self.stretchView:
+            if self.window.width/orisize.x > self.window.height/orisize.y:
+                # eixo Y eh o base
+                ww = self.window.height * orisize.x / orisize.y
+                ww = ww / self.window.width
+                self.window.view.viewport = ((1.0 - ww)/2, 0.0, ww, 1.0)
+            else:
+                # eixo X eh o base
+                hh = self.window.width * orisize.y / orisize.x
+                hh = hh / self.window.height
+                self.window.view.viewport = (0.0, (1.0 - hh)/2, 1.0, hh)
+    
+    def getTimeFromSpeedLevel(self, speedLvl):
+        mins = speedLvl - 1
+        secs = mins*60 - int(mins)*60
+        mins = int(mins)
+        return mins, secs
+    
+    ####### DRAW
+    def draw(self):
+        for i, state in enumerate(self.states):
+            if not state.stacktop_draw or (state.stacktop_draw and i == len(self.states)-1):
+                self.window.draw(state)
+                
+        self.console.draw(self.window)
+        
+    ####### UPDATE
+    def update(self):
+        ### debugging feature to run SUPER!HOT! (frame-per-frame)
+        if not self.cont and self.superhot: 
+            return
+        self.cont = False
+
+        elapsed = self.clock.restart()
+        self.actual_fps = 1.0/elapsed.seconds
+        
+        dt = elapsed.seconds #1.0 / self.fps
+        self.delta_time = dt
+        
+        self.sounds.update()
+        
+        if len(self.states) <= 0:
+            self.window.close()
+            return
+        
+        if not self.console.open:
+            state = self.states[-1]
+            running = state.update(dt)
+            if not running:
+                self.states.remove(state)
+                state.onPopFromGame()
+
+    ####### INPUT
+    def processInput(self, e):
+        if type(e) is sf.KeyEvent:
+            self.cont = True
+            if e.code == sf.Keyboard.ESCAPE:
+                self.window.close()
+                return
+        if self.cheats_enabled:
+            self.console.processInput(e)
+        if self.console.open:   return
+        
+        if len(self.states) > 0:
+            self.states[-1].processInput(e)
+        else:
+            self.window.close()
+
+    @property
+    def entities(self):
+        if len(self.states) > 0:
+            return self.states[-1].entities
+        return []
+            
 Game = Game()
 
 from utils import Vector, GUIText, Console, PlayerHUD

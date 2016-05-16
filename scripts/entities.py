@@ -4,13 +4,18 @@
 import sfml as sf
 import random, math
 from game import Game
-from utils import Vector, GUIText, isInArray, Turret, PlayerHUD
+from utils import Vector, GUIText, isInArray, Turret, PlayerHUD, getEntClosestTo
 from effects import CreateVehicleDustCloud, CreateVehicleCollision, CreateVehicleExplosion, CreateExplosionAt
 import powerup
 import input
 
 #******************************** ENTITIES ************************************
 class BaseEntity:
+    entCount = 0
+    def getIDfor(ent):
+        BaseEntity.entCount += 1
+        return BaseEntity.entCount
+    
     def __init__(self, type, x, y, w, h, color, speed, hp, points):
         self.type = type
         self.pos = Vector(x,y)
@@ -25,7 +30,7 @@ class BaseEntity:
         self.hp = hp
         self.max_hp = hp
         self.show_life_bar = True
-        self.ID = Game.getIDfor(self)
+        self.ID = BaseEntity.getIDfor(self)
         self.point_value = points
         self.last_moved_dir = Vector(0,0)
         self.considers_game_speed = False
@@ -116,7 +121,7 @@ class BaseEntity:
     def speed(self):
         s = self.base_speed
         if self.considers_game_speed:
-            s = s * (Game.speed_level + 5)
+            s = s * (Game.states[-1].speed_level + 5)
         return s * (1.0 - self.stuck*0.85) #0.85 is % of speed lost while stuck
 
     def move(self, dir):
@@ -146,6 +151,8 @@ class Player(BaseEntity):
         self.input = input.available_inputs[self.input_index](self)
         if not self.input.valid():
             self.changeInput(False)
+        self.paused = False #to facilitate input method checking if game is paused (and by which player)
+        self.speed_level = 1.0
         
     def draw(self, window):
         BaseEntity.drawEntity(self, window)
@@ -224,15 +231,17 @@ class Berserker(BaseEntity):
         self.moveAwayElapsed = 0.0
 
     def update(self, dt):
-        dir = Game.player.center() - self.center()
-        dir.normalize()
-        if not self.isChasing:
-            dir = -dir
-            self.moveAwayElapsed += dt
-            if self.moveAwayElapsed > 0.7:
-                self.isChasing = True
-                self.moveAwayElapsed = 0.0
-        self.move(dir)
+        player = getEntClosestTo(self.center(), ['player'])
+        if player != None:
+            dir = player.center() - self.center()
+            dir.normalize()
+            if not self.isChasing:
+                dir = -dir
+                self.moveAwayElapsed += dt
+                if self.moveAwayElapsed > 0.7:
+                    self.isChasing = True
+                    self.moveAwayElapsed = 0.0
+            self.move(dir)
         CreateVehicleDustCloud(self)
 
     def collidedWith(self, ent):
@@ -264,14 +273,19 @@ class Slinger(BaseEntity):
         self.cooldown = 0.0
         self.range = random.random()*200 + 100 #range in [100, 300]
         self.turret = Turret(self)
+        self.player = getEntClosestTo(self.center(), ['player'])
 
     def update(self, dt):
-        dir = Game.player.center() - self.center()
-        dist = dir.len()
-        dir.normalize()
+        self.player = getEntClosestTo(self.center(), ['player'])
+        dir = None
+        dist = self.range
+        if self.player != None:
+            dir = self.player.center() - self.center()
+            dist = dir.len()
+            dir.normalize()
         
         if abs(dist - self.range) > 30:
-            move_target = Game.player.pos + dir*(-self.range)
+            move_target = self.player.pos + dir*(-self.range)
             move_dir = move_target - self.pos
             move_dir.normalize()
             self.move(move_dir)
@@ -280,7 +294,7 @@ class Slinger(BaseEntity):
         CreateVehicleDustCloud(self)
         
         self.cooldown += dt
-        if self.cooldown > self.time_to_shoot:
+        if self.cooldown > self.time_to_shoot and dir != None:
             #SHOOT!
             init_pos = self.center()
             projectile = Projectile(init_pos.x, init_pos.y, 6, 15, dir, 2, sf.graphics.Color(255,180,180,255) )
@@ -291,8 +305,10 @@ class Slinger(BaseEntity):
     def draw(self, window):
         BaseEntity.drawEntity(self, window)
         BaseEntity.drawHPBar(self, window)
-        dir = Game.player.center() - self.center()
-        dir.normalize()
+        dir = None
+        if self.player != None:
+            dir = self.player.center() - self.center()
+            dir.normalize()
         self.turret.draw(window, dir)
 
     def collidedWith(self, ent):
@@ -325,6 +341,7 @@ class WarRig(BaseEntity):
         BaseEntity.__init__(self, 'warrig', x, y, 40, 160, 'yellow', 1, 300, 1000)
         self.time_to_shoot = 1.0
         self.cooldown = 0.0
+        self.player = getEntClosestTo(self.center(), ['player'])
 
     def createTurrets(self):
         Game.entities.append(RigTurret(self, 5.0/16))
@@ -332,16 +349,16 @@ class WarRig(BaseEntity):
 
     def update(self, dt):
         firing_pos = self.pos + self.size*(0.5, 0.16)
-        dir = Game.player.center() - firing_pos
-        dir.normalize()
+        self.player = getEntClosestTo(self.center(), ['player'])
         
-        lastPos = self.pos.copy()
-        self.move(dir)
+        if self.player != None:
+            dir = self.player.center() - firing_pos
+            dir.normalize()
+            self.move(dir)
         CreateVehicleDustCloud(self)
-        posDiff = self.pos - lastPos
         
         self.cooldown += dt
-        if self.cooldown > self.time_to_shoot:
+        if self.cooldown > self.time_to_shoot and self.player != None:
             #SHOOT!
             init_pos = firing_pos
             projectile = Projectile(init_pos.x, init_pos.y, 10, 15, dir, 2, sf.Color.RED )
@@ -388,8 +405,10 @@ class RigTurret(BaseEntity):
         self.turret = Turret(self, 0.75)
 
     def draw(self, window):
-        dir = Game.player.center() - self.center()
-        dir.normalize()
+        dir = None
+        if self.rig.player != None:
+            dir = self.rig.player.center() - self.center()
+            dir.normalize()
         self.turret.draw(window, dir)
 
     def update(self, dt):
@@ -402,14 +421,15 @@ class RigTurret(BaseEntity):
         if self.cooldown > self.time_to_shoot:
             #SHOOT!
             init_pos = self.center()
-            dir = Game.player.center() - init_pos
-            dir.normalize()
-            projectile = Projectile(init_pos.x, init_pos.y, 5, 15, dir, 2, sf.graphics.Color(255,240,240,255))
-            projectile.color = '#000080'
-            projectile.cant_hit.append(self.type)
-            projectile.cant_hit.append('warrig')
-            Game.entities.append(projectile)
-            self.cooldown = 0.0
+            if self.rig.player != None:
+                dir = self.rig.player.center() - init_pos
+                dir.normalize()
+                projectile = Projectile(init_pos.x, init_pos.y, 5, 15, dir, 2, sf.graphics.Color(255,240,240,255))
+                projectile.color = '#000080'
+                projectile.cant_hit.append(self.type)
+                projectile.cant_hit.append('warrig')
+                Game.entities.append(projectile)
+                self.cooldown = 0.0
  
     def collidedWith(self, ent):
         if ent.type == 'player':

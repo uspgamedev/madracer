@@ -49,7 +49,6 @@ class InputInterface(sf.Drawable):
         sf.Drawable.__init__(self)
         self.name = name
         self.player = player
-        self.loop_commands = []
         self.texts = []
         self.graphics_params = ()
         
@@ -167,7 +166,7 @@ class KeyboardInput(InputInterface):
     def processInput(self, e):
         if type(e) != sf.KeyEvent:  return
         isDown = not e.released
-        if self.player.hp > 0 and not Game.paused:
+        if self.player.hp > 0 and not self.player.paused:
             if e.code == sf.Keyboard.S and not isDown:
                 self.player.release_bomb()
             elif e.code == sf.Keyboard.W and not isDown:
@@ -180,18 +179,17 @@ class KeyboardInput(InputInterface):
             
         if (e.code == sf.Keyboard.Q and e.control) or e.code == sf.Keyboard.ESCAPE:
             # CLOSE
-            self.loop_commands.append(InputInterface.CLOSE)
+            Game.loop_commands.append(InputInterface.CLOSE)
         elif e.code == sf.Keyboard.F1 and e.released:
             # TOGGLE FULLSCREEN
-            self.loop_commands.append(InputInterface.TOGGLE_FULLSCREEN)
+            Game.loop_commands.append(InputInterface.TOGGLE_FULLSCREEN)
         elif e.code == sf.Keyboard.F and e.control and e.released:
             # TOGGLE SHOW FPS
-            self.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
+            Game.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
         elif e.code == sf.Keyboard.F2 and e.released:
             self.player.changeInput()
         elif e.code == sf.Keyboard.SPACE and e.released:
-            Game.pause()
-            #Game.paused = True
+            Game.loop_commands.append(InputInterface.PAUSE)
         
     def update(self, dt):
         self.target = getEntClosestTo(self.player.center())
@@ -266,7 +264,7 @@ class MouseKeyInput(InputInterface):
         return dir
         
     def processInput(self, e):
-        if self.player.hp > 0 and not Game.paused:
+        if self.player.hp > 0 and not self.player.paused:
             if type(e) == sf.KeyEvent and e.code == sf.Keyboard.E and e.released:
                 self.player.release_bomb()
             elif type(e) == sf.MouseButtonEvent:
@@ -279,17 +277,17 @@ class MouseKeyInput(InputInterface):
         if type(e) == sf.KeyEvent:
             if (e.code == sf.Keyboard.Q and e.control) or e.code == sf.Keyboard.ESCAPE:
                 # CLOSE
-                self.loop_commands.append(InputInterface.CLOSE)
+                Game.loop_commands.append(InputInterface.CLOSE)
             elif e.code == sf.Keyboard.F1 and e.released:
                 # TOGGLE FULLSCREEN
-                self.loop_commands.append(InputInterface.TOGGLE_FULLSCREEN)
+                Game.loop_commands.append(InputInterface.TOGGLE_FULLSCREEN)
             elif e.code == sf.Keyboard.F and e.control and e.released:
                 # TOGGLE SHOW FPS
-                self.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
+                Game.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
             elif e.code == sf.Keyboard.F2 and e.released:
                 self.player.changeInput()
             elif e.code == sf.Keyboard.SPACE and e.released:
-                Game.pause()
+                Game.loop_commands.append(InputInterface.PAUSE)
         
     def update(self, dt):
         if self.try_fire:
@@ -411,7 +409,7 @@ class GamePadInput(InputInterface):
         return self.move
         
     def processInput(self, e):
-        if self.player.hp > 0 and not Game.paused:
+        if self.player.hp > 0 and not self.player.paused:
             if type(e) == sf.JoystickButtonEvent:
                 if e.button == GamePadInput.RIGHT_TRIGGER and e.released and (self.target.x != 0 or self.target.y != 0):
                     self.player.shoot_bomb()
@@ -464,17 +462,17 @@ class GamePadInput(InputInterface):
         if type(e) == sf.JoystickButtonEvent:
             if e.button == GamePadInput.START:
                 # CLOSE
-                self.loop_commands.append(InputInterface.CLOSE)
+                Game.loop_commands.append(InputInterface.CLOSE)
             elif e.button == GamePadInput.LEFT_BUTTON and e.released:
                 # TOGGLE FULLSCREEN
-                self.loop_commands.append(InputInterface.TOGGLE_FULLSCREEN)
+                Game.loop_commands.append(InputInterface.TOGGLE_FULLSCREEN)
             elif e.button == GamePadInput.LEFT_TRIGGER and e.released:
                 # TOGGLE SHOW FPS
-                self.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
+                Game.loop_commands.append(InputInterface.TOGGLE_FPS_DISPLAY)
             elif e.button == GamePadInput.TRIANGLE and e.released:
                 self.player.changeInput()
             elif e.button == GamePadInput.CIRCLE and e.released:
-                Game.pause()
+                Game.loop_commands.append(InputInterface.PAUSE)
                 
         if type(e) == sf.JoystickConnectEvent and e.disconnected == True:
             self.player.changeInput()

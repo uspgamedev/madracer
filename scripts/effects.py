@@ -73,11 +73,11 @@ class Explosion(sf.Drawable):
         return self.pos + self.size*0.5
 
     def speed(self):
-        s = self.base_speed * Game.speed_level + 5
+        s = self.base_speed * Game.states[-1].speed_level + 5
         return s
 #end class Explosion
 def CreateExplosion(pos, size, speed, type):
-    Game.effects.append( Explosion(pos, size, speed, type) )
+    Game.states[-1].effects.append( Explosion(pos, size, speed, type) )
 
 def CreateExplosionAt(ent, size, speed, type):
     CreateExplosion(ent.center(), size, speed, type)

@@ -26,7 +26,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
     tfps = sf.Text("-", font, character_size=25)
     tfps.color = sf.Color.RED
     def updateFPStextPos():
-        tfps.position = Game.track_pos.x, 5#(window.width-250, window.height-60)
+        tfps.position = 100, 5
     updateFPStextPos()
     showFps = False
     
@@ -45,7 +45,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
             else:
                 Game.processInput(event)
         
-        for cmd in Game.player.input.loop_commands:
+        for cmd in Game.loop_commands:
             if cmd == input.InputInterface.CLOSE:
                 window.close();
             elif cmd == input.InputInterface.TOGGLE_FULLSCREEN:
@@ -63,7 +63,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
                 updateFPStextPos()
             elif cmd == input.InputInterface.TOGGLE_FPS_DISPLAY:
                 showFps = not showFps
-        Game.player.input.loop_commands = []
+        Game.loop_commands = []
         
         window.clear() # clear screen
 

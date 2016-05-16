@@ -91,6 +91,31 @@ class Turret:
         self.spr.rotation = math.degrees(angle) #rotation angle (in degrees?)
         window.draw(self.spr)
 
+class Track(sf.Drawable):
+    def __init__(self, fullWidth=False):
+        sf.Drawable.__init__(self)
+        self.spr = sf.Sprite(game.Game.images.track)
+        self.fullWidth = fullWidth
+        if fullWidth:
+            self.spr.ratio = game.Game.window.view.size.x/game.Game.images.track.width, 1.0
+        self.spr.position = game.Game.track_pos.x, -2100
+        
+    def update(self, spd_level):
+        xpos = game.Game.track_pos.x if not self.fullWidth else 0
+        self.spr.position = xpos, self.spr.position.y + (spd_level + 5)
+        if self.spr.position.y > 700:
+            self.spr.position = (xpos, -2100)
+        
+    def draw(self, target, states):
+        tpy = self.spr.position.y
+        if tpy > 0:
+            topHalfY = tpy - self.spr.texture.height
+            xpos = game.Game.track_pos.x if not self.fullWidth else 0
+            self.spr.position = xpos, topHalfY
+            target.draw(self.spr, states)
+            self.spr.position = xpos, tpy
+        target.draw(self.spr, states)
+        
 def isInArray(value, array):
     return value in array
 
@@ -409,11 +434,13 @@ class TextEntry(sf.Drawable):
         self.input_area.fill_color = backColor
         self.input_area.outline_thickness = outlineThickness
         self.input_area.outline_color = outlineColor
-        self.txtui = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+8), GUIText.HOR_LEFT, textColor, charSize)
+        self.txtui = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+(rect.size.y-charSize)/2), GUIText.HOR_LEFT, textColor, charSize)
         self.cursor = sf.RectangleShape((2, charSize))
         self.cursor.fill_color = cursorColor
         self.line = s
         self.line_index = len(s)
+        self.active = True
+        self.max_text_length = -1
         
     @property
     def position(self):
@@ -441,7 +468,16 @@ class TextEntry(sf.Drawable):
     @text.setter
     def text(self, s):
         self.line = s
+        if self.max_text_length > 0 and len(s) > self.max_text_length:
+            self.line = s[:self.max_text_length]
         self.line_index = len(s)
+    
+    @property
+    def outline_color(self):
+        return self.input_area.outline_color
+    @outline_color.setter
+    def outline_color(self, cor):
+        self.input_area.outline_color = cor
     
     def processInput(self, e):
         if type(e) == sf.TextEvent:
@@ -455,7 +491,7 @@ class TextEntry(sf.Drawable):
                 if len(self.line) > 0:
                     self.line = self.line[:self.line_index-1] + self.line[self.line_index:]
                     self.line_index -= 1
-            else:
+            elif self.max_text_length == -1 or (self.max_text_length > 0 and len(self.line) < self.max_text_length):
                 try:
                     c = str(chr(e.unicode))
                     c = c.encode("ascii", "ignore")
@@ -480,7 +516,8 @@ class TextEntry(sf.Drawable):
         target.draw(self.input_area, states)
         self.txtui.set_text(self.line)
         target.draw(self.txtui, states)
-        target.draw(self.cursor, states)
+        if self.active:
+            target.draw(self.cursor, states)
     
 ################################################################
 # Console

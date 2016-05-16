@@ -222,8 +222,7 @@ class LocalGame(GameState):
         self.effects = []
         BaseEntity.entCount = 0
         self.speed_level = 1.0
-        self.track = sf.Sprite(Game.images.track)
-        self.track.position = Game.track_pos.x, -2100
+        self.track = Track()
         self.music = sf.Music.from_file('sounds/music.ogg')
         self.music.play()
         self.music.loop = True
@@ -348,10 +347,8 @@ class LocalGame(GameState):
                 eff.update(dt)
                 if eff.destroyed:
                     self.effects.remove(eff)
-            
-            self.track.position = Game.track_pos.x, self.track.position.y + (self.speed_level + 5)
-            if self.track.position.y > 700:
-                self.track.position = (Game.track_pos.x, -2100)
+
+            self.track.update(self.speed_level)
         elif self.player.hp <= 0:
             return False
         return True
@@ -406,12 +403,6 @@ class LocalGame(GameState):
                         self.cheated = True
   
     def draw(self, target, states):
-        tpy = self.track.position.y
-        if tpy > 0:
-            topHalfY = tpy - self.track.texture.height
-            self.track.position = Game.track_pos.x, topHalfY
-            target.draw(self.track, states)
-            self.track.position = Game.track_pos.x, tpy
         target.draw(self.track, states)
         
         for bar in self.side_bars:
@@ -491,14 +482,7 @@ class GameOverScreen(GameState):
     def onPopFromGame(self):
         if not self.cheated:
             Game.highscores.InsertScore(self.players[0].name, round(self.players[0].points), self.players[0].speed_level)
-        
-        #TODO: FIX THIS
-        # this should not be necessary with the main menu since it should be the base state in the stack, meaning it will 
-        # be shown again when this pops
-        state = LocalGame()
-        state.pushToGame()
-        
-        
+
     def update(self, dt):
         return self.active
         
@@ -517,6 +501,80 @@ class GameOverScreen(GameState):
         elif hs_index >= 0:
             self.restartTxt.set_text("Press ENTER to start a new game.\nEntered Highscores@%s!" % (hs_index))
         target.draw(self.restartTxt, states)
+       
+class MainMenuScreen(GameState):
+    def __init__(self):
+        GameState.__init__(self)
+        self.stacktop_draw = True
+        width, height = Game.window.view.size
+        self.track = Track(True)
+        
+        self.title = GUIText("MAD Racer!", (width/2, 20), GUIText.HOR_CENTER, sf.Color.BLACK, 60)
+        self.title.txt.style = sf.Text.BOLD
+        self.title.outline_color = sf.Color.RED
+        self.title.outline_thickness = 1
+
+        self._activeindex = 0
+        self.plaTexts = []
+        self.playerNames = []
+        y = 90
+        for i in xrange(4):
+            platxt = GUIText("Player %i:" % (i), (width/4, y+8), GUIText.HOR_RIGHT, sf.Color.BLACK, 18)
+            platxt.txt.style = sf.Text.BOLD
+            platxt.outline_color = sf.Color.RED
+            platxt.outline_thickness = 1
+            self.plaTexts.append(platxt)
+            
+            plainput = TextEntry("", sf.Rectangle((width/4+5, y), (width/5, 33)),
+                                20, sf.Color.WHITE, sf.Color(0,0,0,180), 3, sf.Color.RED, sf.Color.WHITE)
+            plainput.active = False
+            plainput.max_text_length = 12
+            if i == self.active_index:
+                plainput.active = True
+                plainput.outline_color = sf.Color.BLUE
+            self.playerNames.append(plainput)
+            
+            y += 50
+        
+    @property
+    def active_index(self):
+        return self._activeindex
+    @active_index.setter
+    def active_index(self, i):
+        prev = self.playerNames[self._activeindex]
+        self._activeindex = i
+        if self._activeindex < 0:   self._activeindex = 0
+        if self._activeindex > 3:   self._activeindex = 3
+        curr = self.playerNames[self._activeindex]
+        if prev != curr:
+            prev.active = False
+            prev.outline_color = sf.Color.RED
+            curr.active = True
+            curr.outline_color = sf.Color.BLUE
+        
+    def update(self, dt):
+        self.track.update(2.0)
+        return True
+        
+    def processInput(self, e):
+        self.playerNames[self.active_index].processInput(e)
+        
+        if type(e) == sf.KeyEvent and e.released:
+            if e.code == sf.Keyboard.DOWN:
+                self.active_index += 1
+            if e.code == sf.Keyboard.UP:
+                self.active_index -= 1
+            if e.code == sf.Keyboard.RETURN:
+                localGame = LocalGame()
+                localGame.pushToGame()
+                
+        
+    def draw(self, target, states):
+        target.draw(self.track, states)
+        target.draw(self.title, states)
+        for platxt, plainput in zip(self.plaTexts, self.playerNames):
+            target.draw(platxt, states)
+            target.draw(plainput, states)
         
 ################################################################
 class Game(object):
@@ -550,7 +608,7 @@ class Game(object):
         self.clock = sf.Clock()
         self.clock.restart()
         
-        self.states = [LocalGame()]
+        self.states = [MainMenuScreen()]
         #aefdaefaef
         
     def updateGraphics(self):
@@ -633,7 +691,7 @@ class Game(object):
             
 Game = Game()
 
-from utils import Vector, GUIText, Console, PlayerHUD
+from utils import Vector, GUIText, Console, PlayerHUD, Track, TextEntry
 from powerup import RandomizePowerUp
 from entities import *
 from effects import TimedAction, NewEntityAction

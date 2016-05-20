@@ -165,7 +165,8 @@ class Player(BaseEntity):
         
     def drawUI(self, window):
         window.draw(self.hud)
-        window.draw(self.input)
+        if self.hp > 0:
+            window.draw(self.input)
 
     def update(self, dt):
         self.input.update(dt)
@@ -187,7 +188,7 @@ class Player(BaseEntity):
         if self.cooldown_elapsed >= self.cooldown_time and self.shots_available > 0:
             dir = self.input.target_dir()
             init_pos = self.center()
-            projectile = Projectile(init_pos.x, init_pos.y, self.shot_dmg, self.shot_speed, dir, 2, sf.Color.GREEN)
+            projectile = Projectile(init_pos.x, init_pos.y, self.shot_dmg, self.shot_speed, dir, 2, self.color)
             projectile.cant_hit.append(self.type)
             Game.entities.append(projectile)
             self.shots_available -= 1
@@ -198,14 +199,14 @@ class Player(BaseEntity):
         if self.bombs > 0:
             #release bomb
             self.bombs -= 1
-            bomb = Bomb(self.pos.x, self.pos.y, Vector(0,1), 1, 120, 200)
+            bomb = Bomb(self.pos.x, self.pos.y, Vector(0,1), 1, 120, 200, self.color)
             Game.entities.append(bomb)
     def shoot_bomb(self):
         if self.bombs > 0 and self.input.target_dir() != None:
             #shoot bomb
             self.bombs -= 1
             dir = self.input.target_dir()
-            bomb = Bomb(self.pos.x, self.pos.y, dir, 2, 90, 120)
+            bomb = Bomb(self.pos.x, self.pos.y, dir, 2, 90, 120, self.color)
             Game.entities.append(bomb)
 
     def collidedWith(self, ent):
@@ -466,7 +467,7 @@ class RigTurret(BaseEntity):
 #/*********** Projectile *****************
 class Projectile(BaseEntity):
     def __init__(self, x, y, dmg, speed, dir, lifetime, color):
-        BaseEntity.__init__(self, 'projectile', x, y, 7, 7, 'blue', speed, 1, 0)
+        BaseEntity.__init__(self, 'projectile', x, y, 7, 7, color, speed, 1, 0)
         self.pos = self.pos - self.size*0.5
         self.dmg = dmg
         self.dir = dir.copy()
@@ -497,8 +498,8 @@ class Projectile(BaseEntity):
 
 #*********** Bomb ************************
 class Bomb(BaseEntity):
-    def __init__(self, x, y, dir, speed, dmg, radius):
-        BaseEntity.__init__(self, 'bomb', x, y, 30, 30, 'purple', speed, 1, 0)
+    def __init__(self, x, y, dir, speed, dmg, radius, color):
+        BaseEntity.__init__(self, 'bomb', x, y, 30, 30, color, speed, 1, 0, True)
         self.dmg = dmg
         self.blast_radius = radius
         self.dir = dir

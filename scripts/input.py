@@ -363,7 +363,7 @@ class InputMethod(sf.Drawable):
         self.target = self.update_target()
         target_dir = self.target_dir()
         self.try_fire = self.action_value(InputMethod.FIRE)
-        if self.try_fire and target_dir != None and target_dir.x != 0.0 and target_dir.y != 0.0:
+        if self.try_fire and target_dir != None and (target_dir.x != 0.0 or target_dir.y != 0.0):
             self.player.fire()
 
     def target_dir(self):

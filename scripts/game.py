@@ -715,8 +715,11 @@ class MainMenuScreen(GameState):
                 self.hor_active_index = 3
                 self.handleJoystickIDChange(joyID)
                 self.hor_active_index = hai
+            else:
+                self.pla_inputIDs[self.active_index] = None
         else:
             self.get_active_entry().text = "-------"
+            self.pla_inputIDs[self.active_index] = None
         
     def handleJoystickIDChange(self, joyID=None):
         if not joyID:
@@ -746,7 +749,11 @@ class MainMenuScreen(GameState):
             nind = plapresets.index(None)
             self.showError("Invalid preset for player %i" % (plaIndexes[nind]+1))
             return
-        #FIXME: testa se tem presets usando mesmo binding
+        for p in plapresets:
+            for p2 in plapresets:
+                if p != p2 and p.conflictsWith(p2):
+                    self.showError("Presets %s and %s have conflicting bindings." % (p.name, p2.name))
+                    return
         plainputsIDs = [self.pla_inputIDs[i] for i in plaIndexes]
         for i, piid in enumerate(plainputsIDs):
             if plapresets[i].device_type() != input.Binding.DEVICE_JOYSTICK:    continue

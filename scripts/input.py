@@ -238,17 +238,28 @@ class Preset:
         }
         self.name = ""
         
-    def save(self): ###FIXME
-        pass
+    def conflictsWith(self, preset):
+        if self.name == preset.name:    return True
+        if self.targeting_type == InputMethod.POINT_TARGETING and self.targeting_type == preset.targeting_type:
+            return True
+        mybinds = self.all_bindings
+        otherbinds = preset.all_bindings
+        for b in mybinds:
+            for ob in otherbinds:
+                if str(b) == str(ob):
+                    return True
+        return False
         
-    def load(self): ###FIXME
-        pass
-        
-    def valid(self):
-        if len(self.name) <= 0: return "Name cannot be empty"
+    @property
+    def all_bindings(self):
         allBindings = self.bindings.values() 
         if self.targeting_type == InputMethod.DIRECTIONAL_TARGETING:
             allBindings += self.targeting_bindings.values()
+        return allBindings
+        
+    def valid(self):
+        if len(self.name) <= 0: return "Name cannot be empty"
+        allBindings = self.all_bindings
             
         dev_type = None
         for bind in allBindings:
@@ -264,10 +275,7 @@ class Preset:
         return ""
             
     def can_add_binding(self, b):
-        allBindings = self.bindings.values() 
-        if self.targeting_type == InputMethod.DIRECTIONAL_TARGETING:
-            allBindings += self.targeting_bindings.values()
-            
+        allBindings = self.all_bindings
         for bind in allBindings:
             if str(bind) == str(b):
                 return False

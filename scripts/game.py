@@ -702,39 +702,33 @@ class MainMenuScreen(GameState):
                     self.active = False
                 
     def handlePresetChange(self, joyID=None):
-        preset_list = input.InputManager.PresetList()
-        if len(preset_list) <= 0:   return
-        preset = None
-        if not self.presets[self.active_index]:
+        used_presets = [p.name for p in self.presets if p != None]
+        preset_list = [p for p in input.InputManager.PresetList() if not p in used_presets]
+        preset = None #to be able to reset presets
+        if len(preset_list) > 0:
             preset = input.InputManager.presets[preset_list[0]]
-        else:
-            preind = preset_list.index(self.presets[self.active_index].name)
-            preind += 1
-            if preind >= len(preset_list):
-                preind = 0
-            preset = input.InputManager.presets[preset_list[preind]]
         self.presets[self.active_index] = preset
-        self.get_active_entry().text = preset.name
-        if preset.device_type() == input.Binding.DEVICE_JOYSTICK:
-            hai = self.hor_active_index
-            self.hor_active_index = 3
-            self.handleJoystickIDChange(joyID)
-            self.hor_active_index = hai
+        if preset != None:
+            self.get_active_entry().text = preset.name
+            if preset.device_type() == input.Binding.DEVICE_JOYSTICK:
+                hai = self.hor_active_index
+                self.hor_active_index = 3
+                self.handleJoystickIDChange(joyID)
+                self.hor_active_index = hai
+        else:
+            self.get_active_entry().text = "-------"
         
     def handleJoystickIDChange(self, joyID=None):
         if not joyID:
-            joyid_list = input.InputManager.ConnectedJoystickIDs()
-            if len(joyid_list) <= 0:   return
-            if not self.pla_inputIDs[self.active_index]:
+            joyid_list = [id for id in input.InputManager.ConnectedJoystickIDs() if not id in self.pla_inputIDs]
+            if len(joyid_list) > 0:
                 joyID = joyid_list[0]
-            else:
-                joyind = joyid_list.index(self.pla_inputIDs[self.active_index])
-                joyind += 1
-                if joyind >= len(joyid_list):
-                    joyind = 0
-                joyID = joyid_list[joyind]
+
         self.pla_inputIDs[self.active_index] = joyID
-        self.get_active_entry().text = "Joystick #%s" % (joyID)
+        if joyID != None:
+            self.get_active_entry().text = "Joystick #%s" % (joyID)
+        else:
+            self.get_active_entry().text = "-------"
             
     def handleStartGame(self):
         plaIndexes = [i for i in xrange(4) if self.players[i][1].text != ""]

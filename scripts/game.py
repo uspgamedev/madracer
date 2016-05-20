@@ -216,7 +216,7 @@ class GameState(sf.Drawable):
         return ssTex
         
 class LocalGame(GameState):
-    def __init__(self):
+    def __init__(self, player_data):
         GameState.__init__(self)
         self.entities = []
         self.effects = []
@@ -233,9 +233,14 @@ class LocalGame(GameState):
         self.cheated = False
         self.generate_entities = True
         
-        self.player = Player(400, 400, "Placeholder", 0)
+        plaX = [200,300,400,500] #FIXME
+        plaColors = [sf.Color.GREEN, sf.Color.BLUE, sf.Color.RED, sf.Color.MAGENTA]
+        self.players = []
+        for i, (plaName, plaPreset, plaInputID) in enumerate(player_data):
+            player = Player(plaX.pop(0), 400, i, plaColors.pop(0), plaName, plaPreset, plaInputID, len(player_data)>1)
+            self.players.append(player)
+            self.entities.append(player)
         self.initGraphics()
-        self.entities.append(self.player)
 
         def powerupFactory(x,y):
             return RandomizePowerUp(Vector(x,y), 1.0)
@@ -262,6 +267,11 @@ class LocalGame(GameState):
             
         self.pause_screen = PauseScreen()
         
+    def game_finished(self):
+        for player in self.players:
+            if player.hp > 0:   return False
+        return True
+        
     def initGraphics(self):
         barWidth = Game.track_pos.x
         width, height = Game.window.view.size
@@ -280,13 +290,14 @@ class LocalGame(GameState):
             createBar(Game.track_pos.x+Game.track_area.x+3, 3, sf.graphics.Color(112,0,0,255))]
                 
     def update(self, dt):
-        if self.player.hp > 0 and not self.paused:
+        if not self.game_finished() and not self.paused:
             # update game stats
-            self.player.points += dt #+1 point per second
             self.speed_level += dt/60.0 #speed_level will increase by 1 each 60 secs
-            self.player.speed_level = self.speed_level
+            for player in self.players:
+                player.points += dt #+1 point per second
+                player.speed_level = self.speed_level
             
-            listenerPos = self.player.center() - Game.track_pos
+            listenerPos = self.players[0].center() - Game.track_pos #FIXME
             listenerPos = (listenerPos / Game.track_area)*100
             sf.Listener.set_position((listenerPos.x,listenerPos.y,0))
             
@@ -332,7 +343,8 @@ class LocalGame(GameState):
                 ent.stuck = False
                 if ent.hp <= 0:
                     ent.onDeath()
-                    self.player.points += ent.point_value
+                    for player in self.players:
+                        player.points += ent.point_value
                     self.entities.remove(ent)
             
             # sort effect by priority
@@ -349,35 +361,38 @@ class LocalGame(GameState):
                     self.effects.remove(eff)
 
             self.track.update(self.speed_level)
-        elif self.player.hp <= 0:
+        elif self.game_finished():
             return False
         return True
         
     def onPopFromGame(self):
         lastScreen = self.getWindowImage()
-        gameOver = GameOverScreen([self.player], self.cheated, lastScreen)
+        gameOver = GameOverScreen(self.players, self.cheated, lastScreen)
         gameOver.pushToGame()
         
     def processInput(self, e):
-        self.player.input.processInput(e)
+        for player in self.players:
+            player.input.processInput(e)
         
         if type(e) is sf.FocusEvent and e.lost:
-            self.pause_screen.pushToGame(self.player)
+            self.pause_screen.pushToGame(self.players[0])
             return
-        if input.InputInterface.PAUSE in Game.loop_commands:
-            self.pause_screen.pushToGame(self.player)
+        if input.InputMethod.PAUSE in Game.loop_commands:
+            self.pause_screen.pushToGame(self.players[0]) #FIXME
         
         if type(e) is sf.KeyEvent:
             if not e.released:
-                if self.player.hp <= 0: return
+                if self.game_finished(): return
                 if Game.cheats_enabled:
                     if e.code == sf.Keyboard.H and e.control:
-                        self.player.hp = self.player.max_hp
+                        for player in self.players:
+                            player.hp = player.max_hp
                         self.cheated = True
                     elif e.code == sf.Keyboard.B and e.control:
-                        self.player.bombs += 1
+                        for player in self.players:
+                            player.bombs += 1
                         self.cheated = True
-            elif self.player.hp > 0:
+            elif not self.game_finished():
                 if Game.cheats_enabled:
                     if e.code == sf.Keyboard.T and e.control:
                         self.entities.append( Berserker(200, 200) )
@@ -417,16 +432,17 @@ class LocalGame(GameState):
             target.draw(eff, states)
         
         # gotta do this separately to ensure player's UI are on top of entities and effects
-        self.player.drawUI(target)
+        for player in self.players:
+            player.drawUI(target)
 
 class PauseScreen(GameState):
     def __init__(self):
         GameState.__init__(self)
         width, height = Game.window.view.size
         self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
-        self.pausedTxt.txt.style = sf.Text.BOLD
-        self.pausedTxt.outline_color = sf.Color.RED
-        self.pausedTxt.outline_thickness = 1
+        self.pausedTxt.style = sf.Text.BOLD
+        self.pausedTxt.text_outline_color = sf.Color.RED
+        self.pausedTxt.text_outline_thickness = 1
         
     def pushToGame(self, player):
         self.player = player
@@ -445,9 +461,9 @@ class PauseScreen(GameState):
         
     def processInput(self, e):
         self.player.input.processInput(e)
-        if input.InputInterface.PAUSE in Game.loop_commands:
+        if input.InputMethod.PAUSE in Game.loop_commands:
             self.player.paused = False
-            Game.loop_commands.remove(input.InputInterface.PAUSE)
+            Game.loop_commands.remove(input.InputMethod.PAUSE)
         if type(e) is sf.FocusEvent:
             self.player.paused = e.lost
         
@@ -466,15 +482,15 @@ class GameOverScreen(GameState):
         width, height = Game.window.view.size
                 
         self.gameOverTxt = GUIText("GAME OVER", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
-        self.gameOverTxt.txt.style = sf.Text.BOLD
-        self.gameOverTxt.outline_color = sf.Color.RED
-        self.gameOverTxt.outline_thickness = 1
+        self.gameOverTxt.style = sf.Text.BOLD
+        self.gameOverTxt.text_outline_color = sf.Color.RED
+        self.gameOverTxt.text_outline_thickness = 1
         
-        restxt = "Press ENTER to start a new game."
+        restxt = "Press ENTER to return to main menu."
         self.restartTxt = GUIText(restxt, (width/2, height/2 + 40), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
-        self.restartTxt.txt.style = sf.Text.BOLD
-        self.restartTxt.outline_color = sf.Color.RED
-        self.restartTxt.outline_thickness = 1
+        self.restartTxt.style = sf.Text.BOLD
+        self.restartTxt.text_outline_color = sf.Color.RED
+        self.restartTxt.text_outline_thickness = 1
         
         Game.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, 
                                        sf.graphics.Color(160,160,0,255), sf.Color.WHITE, sf.Color(0,0,0,180), 3)
@@ -497,85 +513,521 @@ class GameOverScreen(GameState):
         target.draw(self.gameOverTxt, states)
         hs_index = Game.highscores.getHSindex(self.players[0].points)
         if self.cheated:
-            self.restartTxt.set_text("Press ENTER to start a new game.\nCheating disables highscores.")
+            self.restartTxt.text = "Press ENTER to return to main menu.\nCheating disables highscores."
         elif hs_index >= 0:
-            self.restartTxt.set_text("Press ENTER to start a new game.\nEntered Highscores@%s!" % (hs_index))
+            self.restartTxt.text = "Press ENTER to return to main menu.\nEntered Highscores@%s!" % (hs_index)
         target.draw(self.restartTxt, states)
        
 class MainMenuScreen(GameState):
     def __init__(self):
         GameState.__init__(self)
+        self.active = True
         self.stacktop_draw = True
         width, height = Game.window.view.size
         self.track = Track(True)
         
         self.title = GUIText("MAD Racer!", (width/2, 20), GUIText.HOR_CENTER, sf.Color.BLACK, 60)
-        self.title.txt.style = sf.Text.BOLD
-        self.title.outline_color = sf.Color.RED
-        self.title.outline_thickness = 1
+        self.title.style = sf.Text.BOLD
+        self.title.text_outline_color = sf.Color.RED
+        self.title.text_outline_thickness = 1
 
+        def cmdValueActiveChanged(cv):
+            cv.outline_color = sf.Color.BLUE if cv.active else sf.Color.RED
+        def buttonActiveChanged(cv):
+            cv.outline_color = sf.Color.GREEN if cv.active else sf.Color.BLACK
+        
         self._activeindex = 0
-        self.plaTexts = []
-        self.playerNames = []
+        self._hor_activeindex = 1
+        self.players = []
+        self.presets = [None] * 4
+        self.pla_inputIDs = [None] * 4
         y = 90
         for i in xrange(4):
-            platxt = GUIText("Player %i:" % (i), (width/4, y+8), GUIText.HOR_RIGHT, sf.Color.BLACK, 18)
-            platxt.txt.style = sf.Text.BOLD
-            platxt.outline_color = sf.Color.RED
-            platxt.outline_thickness = 1
-            self.plaTexts.append(platxt)
+            x = width/5 - 10
+            platxt = GUIText("Player %i:" % (i+1), (x, y+8), GUIText.HOR_RIGHT, sf.Color.BLACK, 18)
+            platxt.style = sf.Text.BOLD
+            platxt.text_outline_color = sf.Color.RED
+            platxt.text_outline_thickness = 1
             
-            plainput = TextEntry("", sf.Rectangle((width/4+5, y), (width/5, 33)),
+            x += 15
+            planame = TextEntry("", sf.Rectangle((x, y), (width/5, 33)),
                                 20, sf.Color.WHITE, sf.Color(0,0,0,180), 3, sf.Color.RED, sf.Color.WHITE)
-            plainput.active = False
-            plainput.max_text_length = 12
+            planame.onActiveChanged = cmdValueActiveChanged
+            planame.active = False
+            planame.max_text_length = 12
             if i == self.active_index:
-                plainput.active = True
-                plainput.outline_color = sf.Color.BLUE
-            self.playerNames.append(plainput)
+                planame.active = True
+                
+            x += width/5 + 30
+            plainput = FrameText("-------", sf.Rectangle((x, y), (width/5, 33)),
+                                20, sf.Color.WHITE, sf.Color(0,0,0,180), 3, sf.Color.RED, GUIText.HOR_CENTER)
+            plainput.onActiveChanged = cmdValueActiveChanged
+            plainput.active = False
+            
+            x += width/5 + 30
+            gamePadID = FrameText("------", sf.Rectangle((x, y), (width/5, 33)),
+                                20, sf.Color.WHITE, sf.Color(0,0,0,180), 3, sf.Color.RED, GUIText.HOR_CENTER)
+            gamePadID.onActiveChanged = cmdValueActiveChanged
+            gamePadID.active = False
+                
+            self.players.append( (platxt, planame, plainput, gamePadID) )
             
             y += 50
+        
+        y += 20
+        self.errormsg = GUIText("", (width/2, y), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
+        self.errormsg.style = sf.Text.BOLD
+        self.errormsg.text_outline_color = sf.Color.RED
+        self.errormsg.text_outline_thickness = 1
+        self.errormsg_lifetime = 5.0
+        self.errormsg_elapsed = 0.0
+        
+        self.buttons = []
+        y += 40
+        start_button = FrameText("Start Game", sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
+                                24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
+        start_button.onActiveChanged = buttonActiveChanged
+        start_button.active = False
+        self.buttons.append(start_button)
+        
+        y += 60
+        input_button = FrameText("Create Input Preset", sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
+                                24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
+        input_button.onActiveChanged = buttonActiveChanged
+        input_button.active = False
+        self.buttons.append(input_button)
+        
+        y += 60
+        exit_button = FrameText("Exit", sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
+                                24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
+        exit_button.onActiveChanged = buttonActiveChanged
+        exit_button.active = False
+        self.buttons.append(exit_button)
         
     @property
     def active_index(self):
         return self._activeindex
     @active_index.setter
     def active_index(self, i):
-        prev = self.playerNames[self._activeindex]
+        prev = self.get_active_entry()
         self._activeindex = i
-        if self._activeindex < 0:   self._activeindex = 0
-        if self._activeindex > 3:   self._activeindex = 3
-        curr = self.playerNames[self._activeindex]
+        if self._activeindex < 0:   self._activeindex = 6
+        if self._activeindex > 6:   self._activeindex = 0
+        if self._activeindex <= 3:
+            prev_hor = self.hor_active_index
+            self.hor_active_index = self.hor_active_index
+            if self.hor_active_index == 1 and prev_hor != 1:
+                self.hor_active_index = 2
+        curr = self.get_active_entry()
         if prev != curr:
             prev.active = False
-            prev.outline_color = sf.Color.RED
             curr.active = True
-            curr.outline_color = sf.Color.BLUE
+        
+    @property
+    def hor_active_index(self):
+        return self._hor_activeindex
+    @hor_active_index.setter
+    def hor_active_index(self, i):
+        prev = self.get_active_entry()
+        self._hor_activeindex = i
+        
+        lastIndex = 2
+        if self.presets[self.active_index] != None and self.presets[self.active_index].device_type() == input.Binding.DEVICE_JOYSTICK:
+            lastIndex = 3
+        
+        if self._hor_activeindex < 1:   self._hor_activeindex = lastIndex
+        if self._hor_activeindex > lastIndex:   self._hor_activeindex = 1
+        curr = self.get_active_entry()
+        if prev != curr:
+            prev.active = False
+            curr.active = True
+    
+    def get_active_entry(self):
+        if self.active_index <= 3:
+            return self.players[self.active_index][self.hor_active_index]
+        else:
+            return self.buttons[self.active_index-4]
         
     def update(self, dt):
         self.track.update(2.0)
-        return True
+        if self.errormsg.text != "":
+            self.errormsg_elapsed += dt
+            if self.errormsg_elapsed > self.errormsg_lifetime:
+                self.errormsg_elapsed = 0.0
+                self.errormsg.text = ""
+        return self.active
         
     def processInput(self, e):
-        self.playerNames[self.active_index].processInput(e)
+        if self.active_index <= 3 and self.hor_active_index == 1:
+            self.players[self.active_index][1].processInput(e)
         
         if type(e) == sf.KeyEvent and e.released:
             if e.code == sf.Keyboard.DOWN:
                 self.active_index += 1
             if e.code == sf.Keyboard.UP:
                 self.active_index -= 1
+            if e.code == sf.Keyboard.RIGHT and self.active_index <= 3:
+                self.hor_active_index += 1
+            if e.code == sf.Keyboard.LEFT and self.active_index <= 3:
+                self.hor_active_index -= 1
             if e.code == sf.Keyboard.RETURN:
-                localGame = LocalGame()
-                localGame.pushToGame()
+                if self.active_index <= 3:
+                    if self.hor_active_index == 2:
+                        self.handlePresetChange()
+                    elif self.hor_active_index == 3:
+                        self.handleJoystickIDChange()
+                elif self.active_index == 4: #start
+                    self.handleStartGame()
+                elif self.active_index == 5: #create input
+                    self.handleCreateInputPreset()
+                elif self.active_index == 6: #exit
+                    self.active = False
+        elif type(e) == sf.JoystickMoveEvent:
+            if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1:
+                self.active_index += int(e.position/abs(e.position))
+            if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1 and self.active_index <= 3:
+                self.hor_active_index += int(e.position/abs(e.position))
+        elif type(e) == sf.JoystickButtonEvent and e.released:
+            if e.button in range(4):
+                if self.active_index <= 3:
+                    if self.hor_active_index == 2:
+                        self.handlePresetChange(e.joystick_id)
+                    elif self.hor_active_index == 3:
+                        self.handleJoystickIDChange(e.joystick_id)
+                elif self.active_index == 4: #start
+                    self.handleStartGame()
+                elif self.active_index == 5: #create input
+                    self.handleCreateInputPreset()
+                elif self.active_index == 6: #exit
+                    self.active = False
                 
+    def handlePresetChange(self, joyID=None):
+        preset_list = input.InputManager.PresetList()
+        if len(preset_list) <= 0:   return
+        preset = None
+        if not self.presets[self.active_index]:
+            preset = input.InputManager.presets[preset_list[0]]
+        else:
+            preind = preset_list.index(self.presets[self.active_index].name)
+            preind += 1
+            if preind >= len(preset_list):
+                preind = 0
+            preset = input.InputManager.presets[preset_list[preind]]
+        self.presets[self.active_index] = preset
+        self.get_active_entry().text = preset.name
+        if preset.device_type() == input.Binding.DEVICE_JOYSTICK:
+            hai = self.hor_active_index
+            self.hor_active_index = 3
+            self.handleJoystickIDChange(joyID)
+            self.hor_active_index = hai
+        
+    def handleJoystickIDChange(self, joyID=None):
+        if not joyID:
+            joyid_list = input.InputManager.ConnectedJoystickIDs()
+            if len(joyid_list) <= 0:   return
+            if not self.pla_inputIDs[self.active_index]:
+                joyID = joyid_list[0]
+            else:
+                joyind = joyid_list.index(self.pla_inputIDs[self.active_index])
+                joyind += 1
+                if joyind >= len(joyid_list):
+                    joyind = 0
+                joyID = joyid_list[joyind]
+        self.pla_inputIDs[self.active_index] = joyID
+        self.get_active_entry().text = "Joystick #%s" % (joyID)
+            
+    def handleStartGame(self):
+        plaIndexes = [i for i in xrange(4) if self.players[i][1].text != ""]
+        if len(plaIndexes) <= 0:
+            self.showError("No players added...")
+            return
+        planames = [self.players[i][1].text for i in plaIndexes]
+        for i, pn in enumerate(planames):
+            for j, pn2 in enumerate(planames):
+                if i != j and pn == pn2:
+                    self.showError("Players %i and %i have equal names." % (i+1, j+1))
+                    return
+        plapresets = [self.presets[i] for i in plaIndexes]
+        if None in plapresets:
+            nind = plapresets.index(None)
+            self.showError("Invalid preset for player %i" % (plaIndexes[nind]+1))
+            return
+        #FIXME: testa se tem presets usando mesmo binding
+        plainputsIDs = [self.pla_inputIDs[i] for i in plaIndexes]
+        for i, piid in enumerate(plainputsIDs):
+            if plapresets[i].device_type() != input.Binding.DEVICE_JOYSTICK:    continue
+            if piid == None:
+                self.showError("Player %i has no Joystick ID selected." % (i+1))
+                return
+            for j, piid2 in enumerate(plainputsIDs):
+                if plapresets[j].device_type() != input.Binding.DEVICE_JOYSTICK:    continue
+                if i != j and piid != None and piid == piid2:
+                    self.showError("Players %i and %i are using the same Joystick." % (i+1, j+1))
+                    return
+        localGame = LocalGame(zip(planames, plapresets, plainputsIDs))
+        localGame.pushToGame()
+        
+    def handleCreateInputPreset(self):
+        keyselect = InputBindingsScreen()
+        keyselect.pushToGame()
         
     def draw(self, target, states):
         target.draw(self.track, states)
         target.draw(self.title, states)
-        for platxt, plainput in zip(self.plaTexts, self.playerNames):
+        for i, (platxt, planame, plainput, gamepadID) in enumerate(self.players):
             target.draw(platxt, states)
+            target.draw(planame, states)
             target.draw(plainput, states)
+            if self.presets[i] != None and self.presets[i].device_type() == input.Binding.DEVICE_JOYSTICK:
+                target.draw(gamepadID, states)
+        target.draw(self.errormsg, states)
+        for button in self.buttons:
+            target.draw(button, states)
         
+    def showError(self, s):
+        self.errormsg.text = s
+        self.errormsg_elapsed = 0.0
+        
+class InputBindingsScreen(GameState):
+    def __init__(self):
+        GameState.__init__(self)
+        self.active = True
+        width, height = Game.window.view.size
+        self.track = Track(True)
+        
+        self.frame = sf.RectangleShape((width*.8, height*.84))
+        self.frame.position = (width*.1, height*.08)
+        self.frame.fill_color = sf.graphics.Color(0,0,0,180)
+        self.frame.outline_thickness = 3
+        self.frame.outline_color = sf.Color.RED
+        
+        self.title = GUIText("Define input method bindings", (width/2, 20), GUIText.HOR_CENTER, sf.Color.BLACK, 24)
+        self.title.style = sf.Text.BOLD
+        self.title.text_outline_color = sf.Color.RED
+        self.title.text_outline_thickness = 1
+        
+        def cmdValueActiveChanged(cv):
+            cv.outline_color = sf.Color.BLUE if cv.active else sf.Color.RED
+        def buttonActiveChanged(cv):
+            cv.outline_color = sf.Color.GREEN if cv.active else sf.Color.BLACK
+        
+        self.preset = input.Preset()
+        self.mark_event = False
+        cmds = [('Preset Name', None),
+                ('Move Left', input.InputMethod.MOVE_LEFT),
+                ('Move Right', input.InputMethod.MOVE_RIGHT), 
+                ('Move Up', input.InputMethod.MOVE_UP),
+                ('Move Down', input.InputMethod.MOVE_DOWN),
+                ('Fire', input.InputMethod.FIRE),
+                ('Shoot Bomb', input.InputMethod.SHOOT_BOMB),
+                ('Release Bomb', input.InputMethod.RELEASE_BOMB),
+                ('Pause', input.InputMethod.PAUSE),
+                ('Toggle Fullscreen', input.InputMethod.TOGGLE_FULLSCREEN),
+                ('Change Input', input.InputMethod.CHANGE_INPUT),
+                ('Close', input.InputMethod.CLOSE),
+                ('Toggle FPS Display', input.InputMethod.TOGGLE_FPS_DISPLAY),
+                ('Targeting Type', None),
+                ('Target Left', None),
+                ('Target Right', None),
+                ('Target Up', None),
+                ('Target Down', None)]
+        self.cmds_order = [cmd[0] for cmd in cmds]
+        self.target_types = {
+            input.InputMethod.AUTO_TARGETING:   "Auto Targeting",
+            input.InputMethod.POINT_TARGETING:   "Mouse Targeting",
+            input.InputMethod.DIRECTIONAL_TARGETING:   "Directional Targeting"
+        }
+        self._activeindex = 0
+        self.objects = {}
+        x = width*.2 + width*.8*.08
+        y = height*.1
+        for i, (text, key) in enumerate(cmds):
+            cmdtext = GUIText(text, (x, y+8), GUIText.HOR_RIGHT, sf.Color.WHITE, 18)
+            cmdtext.style = sf.Text.BOLD
+            #cmdtext.outline_color = sf.Color.RED
+            #cmdtext.outline_thickness = 1
+            
+            cmdvalue = TextEntry("", sf.Rectangle((x+5, y), (width/5, 33)),
+                                20, sf.Color.WHITE, sf.Color(180,180,180,180), 3, sf.Color.RED, sf.Color.WHITE, GUIText.HOR_CENTER)
+            
+            cmdvalue.onActiveChanged = cmdValueActiveChanged
+            cmdvalue.active = False
+            if i == self.active_index:
+                cmdvalue.max_text_length = 12
+                cmdvalue.active = True
+            else:
+                cmdvalue.cursor.fill_color = sf.Color.TRANSPARENT
+            if i == self.cmds_order.index('Targeting Type'):
+                cmdvalue.text = self.target_types[self.preset.targeting_type]
+            
+            self.objects[text] = (key, cmdtext, cmdvalue)
+            
+            if i == 9:
+                x *= 2.5
+                y = height*.1
+            elif i == self.cmds_order.index('Targeting Type')-1:
+                y += 50*3
+            else:
+                y += 50
+
+        self.errormsg = GUIText("", (width/2, y+20), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
+        self.errormsg.style = sf.Text.BOLD
+        self.errormsg.text_outline_color = sf.Color.RED
+        self.errormsg.text_outline_thickness = 1
+        self.errormsg_lifetime = 5.0
+        self.errormsg_elapsed = 0.0
+
+        self.ok_button = FrameText("DONE", sf.Rectangle((width*.9 - width/6 - 30, y+10), (width/6, 33)),
+                                24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
+        self.ok_button.onActiveChanged = buttonActiveChanged
+        self.ok_button.active = False
+        self.cancel_button = FrameText("BACK", sf.Rectangle((width*.1 + width*.8*.04, y+10), (width/6, 33)),
+                                24, sf.Color.RED, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
+        self.cancel_button.onActiveChanged = buttonActiveChanged
+        self.cancel_button.active = False
+               
+    def onPopFromGame(self):
+        if self.preset.valid() == "":
+            input.InputManager.AddPreset(self.preset)
+               
+    @property
+    def active_index(self):
+        return self._activeindex
+    @active_index.setter
+    def active_index(self, i):
+        prev = self.get_active_entry()
+        self._activeindex = i
+        lastIndex = len(self.cmds_order)-5
+        if self.preset.targeting_type == input.InputMethod.DIRECTIONAL_TARGETING:
+            lastIndex = len(self.cmds_order)-1
+        if self._activeindex < -2:   self._activeindex = lastIndex
+        elif self._activeindex > lastIndex:   self._activeindex = -2
+        curr = self.get_active_entry()
+        if prev != curr:
+            prev.active = False
+            curr.active = True
+        
+    def get_active_entry(self):
+        if self.active_index >= 0:
+            return self.objects[self.cmds_order[self.active_index]][2]
+        elif self.active_index == -1:
+            return self.ok_button
+        elif self.active_index == -2:
+            return self.cancel_button
+        return None
+        
+    def update(self, dt):
+        self.track.update(2.0)
+        if self.errormsg.text != "":
+            self.errormsg_elapsed += dt
+            if self.errormsg_elapsed > self.errormsg_lifetime:
+                self.errormsg_elapsed = 0.0
+                self.errormsg.text = ""
+        return self.active
+        
+    def get_opposite_cmd(self, cmd):
+        if "Down" in cmd:
+            return cmd.replace("Down", "Up")
+        if "Up" in cmd:
+            return cmd.replace("Up", "Down")
+        if "Left" in cmd:
+            return cmd.replace("Left", "Right")
+        if "Right" in cmd:
+            return cmd.replace("Right", "Left")
+        return ""
+        
+    def handleEnter(self):
+        if self.active_index == -1:
+            preval = self.preset.valid()
+            if input.InputManager.HasPreset(self.preset.name):
+                self.errormsg.text = "INVALID: preset already exists"
+            elif preval == "":
+                self.active = False
+            else:
+                self.errormsg.text = "INVALID: "+preval
+        elif self.active_index == -2:
+            self.active = False
+        else:
+            self.mark_event = True
+            self.get_active_entry().outline_color = sf.Color.GREEN
+        
+    def processInput(self, e):
+        if self.active_index == self.cmds_order.index('Preset Name'):
+            self.get_active_entry().processInput(e)
+            self.preset.name = self.get_active_entry().text
+            
+        if self.mark_event:
+            cmd = self.cmds_order[self.active_index]
+            key, _, cmdvalue = self.objects[cmd]
+            if input.Binding.isBindableEvent(e):
+                bind = input.Binding(e)
+                if not self.preset.can_add_binding(bind):
+                    self.errormsg.text = "Can't add binding - already used"
+                    return
+                
+                if key != None:
+                    self.preset.bindings[key] = bind
+                elif cmd in ['Target Left', 'Target Right', 'Target Up', 'Target Down']:
+                    tbkey = cmd.split()[-1].lower()
+                    self.preset.targeting_bindings[tbkey] = bind
+                cmdvalue.text = str(bind)
+                self.mark_event = False
+                self.get_active_entry().outline_color = sf.Color.BLUE
+                opcmd = self.get_opposite_cmd(cmd)
+                if bind.is_axis() and opcmd != "":
+                    opbind = bind.get_opposite_axis_binding()
+                    if not self.preset.can_add_binding(opbind):
+                        self.errormsg.text = "Can't add opposite bind - already used."
+                        return
+                    opkey, _, opcmdvalue = self.objects[opcmd]
+                    if opkey != None:
+                        self.preset.bindings[opkey] = opbind
+                    elif opcmd in ['Target Left', 'Target Right', 'Target Up', 'Target Down']:
+                        tbkey = opcmd.split()[-1].lower()
+                        self.preset.targeting_bindings[tbkey] = opbind
+                    opcmdvalue.text = str(opbind)
+                
+        elif type(e) == sf.KeyEvent and e.released:
+            if e.code == sf.Keyboard.DOWN:
+                self.active_index += 1
+            if e.code == sf.Keyboard.UP:
+                self.active_index -= 1
+            if e.code == sf.Keyboard.LEFT and self.active_index == self.cmds_order.index('Targeting Type'):
+                self.preset.targeting_type -= 1
+                if self.preset.targeting_type < 0:  self.preset.targeting_type = 0
+                self.get_active_entry().text = self.target_types[self.preset.targeting_type]
+            if e.code == sf.Keyboard.RIGHT and self.active_index == self.cmds_order.index('Targeting Type'):
+                self.preset.targeting_type += 1
+                if self.preset.targeting_type > 2:  self.preset.targeting_type = 2
+                self.get_active_entry().text = self.target_types[self.preset.targeting_type]
+            if e.code == sf.Keyboard.RETURN and not self.active_index in [self.cmds_order.index('Preset Name'),self.cmds_order.index('Targeting Type')]:
+                self.handleEnter()
+        elif type(e) == sf.JoystickMoveEvent:
+            if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1:
+                self.active_index += int(e.position/abs(e.position))
+            if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1 and self.active_index == self.cmds_order.index('Targeting Type'):
+                self.preset.targeting_type += int(e.position/abs(e.position))
+                if self.preset.targeting_type < 0:  self.preset.targeting_type = 0
+                if self.preset.targeting_type > 2:  self.preset.targeting_type = 2
+                self.get_active_entry().text = self.target_types[self.preset.targeting_type]
+        elif type(e) == sf.JoystickButtonEvent and e.released:
+            if e.button in range(4) and not self.active_index in [self.cmds_order.index('Preset Name'),self.cmds_order.index('Targeting Type')]:
+                self.handleEnter()
+                
+    def draw(self, target, states):
+        target.draw(self.track, states)
+        target.draw(self.frame, states)
+        target.draw(self.title, states)
+        for i, cmd in enumerate(self.cmds_order):
+            if i >= len(self.cmds_order)-4 and self.preset.targeting_type != input.InputMethod.DIRECTIONAL_TARGETING:
+                break
+            key, cmdtext, cmdvalue = self.objects[cmd]
+            target.draw(cmdtext, states)
+            target.draw(cmdvalue, states)
+        target.draw(self.ok_button, states)
+        target.draw(self.cancel_button, states)
+        target.draw(self.errormsg, states)
+      
 ################################################################
 class Game(object):
     fps = 30.0
@@ -671,7 +1123,7 @@ class Game(object):
     def processInput(self, e):
         if type(e) is sf.KeyEvent:
             self.cont = True
-            if e.code == sf.Keyboard.ESCAPE:
+            if e.code == sf.Keyboard.ESCAPE and e.system:
                 self.window.close()
                 return
         if self.cheats_enabled:
@@ -680,6 +1132,10 @@ class Game(object):
         
         if len(self.states) > 0:
             self.states[-1].processInput(e)
+            if input.InputMethod.CLOSE in self.loop_commands:
+                state = self.states.pop()
+                state.onPopFromGame()
+                self.loop_commands.remove(input.InputMethod.CLOSE)
         else:
             self.window.close()
 
@@ -691,7 +1147,7 @@ class Game(object):
             
 Game = Game()
 
-from utils import Vector, GUIText, Console, PlayerHUD, Track, TextEntry
+from utils import Vector, GUIText, Console, PlayerHUD, Track, TextEntry, FrameText
 from powerup import RandomizePowerUp
 from entities import *
 from effects import TimedAction, NewEntityAction

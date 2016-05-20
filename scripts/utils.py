@@ -265,40 +265,47 @@ class GUIText(sf.Drawable):
     HOR_LEFT_VER_CENTER = 4
     def __init__(self, txt, pos, align=HOR_LEFT, color=sf.Color.BLACK, size=20):
         sf.Drawable.__init__(self)
+        self.char_size = size
         self.txt = sf.Text(txt, game.font, character_size=size)
         self.txt.color = color
         if type(pos) == type([]) or type(pos) == type(()):
             self.txt.position = pos
         else:
             self.txt.position = pos.toSFML()
-        self.align = align
+        self._align = align
         self.updateOrigin()
-        self._outline_color = None
-        self._outline_thickness = 0
+        self._text_outline_color = None
+        self._text_outline_thickness = 0
         
         self.outline_shader = None#sf.Shader.from_file(fragment="scripts/outline.frag")
         #self.outline_shader.set_currenttexturetype_parameter("texture")
         #self.outline_shader.set_2float_parameter("stepSize", 0.0, 0.0)
         
     @property
-    def outline_color(self):
-        return self._outline_color
-        
-    @outline_color.setter
-    def outline_color(self, c):
-        self._outline_color = c
+    def text_outline_color(self):
+        return self._text_outline_color  
+    @text_outline_color.setter
+    def text_outline_color(self, c):
+        self._text_outline_color = c
         #self.outline_shader.set_color_parameter("outlineColor", c)
         
     @property
-    def outline_thickness(self):
-        return self._outline_thickness
-        
-    @outline_thickness.setter
-    def outline_thickness(self, size):
-        self._outline_thickness = size
-        #stepSizeX = self._outline_thickness/self.txt.local_bounds.width if self.txt.local_bounds.width > 0 else 0
-        #stepSizeY = self._outline_thickness/self.txt.local_bounds.height if self.txt.local_bounds.height > 0 else 0
+    def text_outline_thickness(self):
+        return self._text_outline_thickness
+    @text_outline_thickness.setter
+    def text_outline_thickness(self, size):
+        self._text_outline_thickness = size
+        #stepSizeX = self._text_outline_thickness/self.txt.local_bounds.width if self.txt.local_bounds.width > 0 else 0
+        #stepSizeY = self._text_outline_thickness/self.txt.local_bounds.height if self.txt.local_bounds.height > 0 else 0
         #self.outline_shader.set_2float_parameter("stepSize", stepSizeX, stepSizeY)
+        
+    @property
+    def style(self):
+        return self.txt.style
+    @style.setter
+    def style(self, sty):
+        self.txt.style = sty
+        self.updateOrigin()
         
     def updateOrigin(self):
         bounds = self.txt.local_bounds
@@ -313,21 +320,30 @@ class GUIText(sf.Drawable):
         elif self.align == GUIText.HOR_LEFT_VER_CENTER:
             self.txt.origin = (bounds.left, bounds.top + bounds.height/2)
         
+    @property
     def text(self):
         return self.txt.string
-    def set_text(self, s):
+    @text.setter
+    def text(self, s):
+        self._base_set_text(s)
+        
+    def _base_set_text(self, s):
         try:
             self.txt.string = s
         except:
             self.txt.string = "<ERROR>"
             print "ERROR: Cant display string '%s'" % (s)
         self.updateOrigin()
-        #stepSizeX = self._outline_thickness/self.txt.local_bounds.width if self.txt.local_bounds.width > 0 else 0
-        #stepSizeY = self._outline_thickness/self.txt.local_bounds.height if self.txt.local_bounds.height > 0 else 0
+        #stepSizeX = self._text_outline_thickness/self.txt.local_bounds.width if self.txt.local_bounds.width > 0 else 0
+        #stepSizeY = self._text_outline_thickness/self.txt.local_bounds.height if self.txt.local_bounds.height > 0 else 0
         #self.outline_shader.set_2float_parameter("stepSize", stepSizeX, stepSizeY)
         
-    def set_align(self, a):
-        self.align = a
+    @property
+    def align(self):
+        return self._align
+    @align.setter
+    def align(self, a):
+        self._align = a
         self.updateOrigin()
         
     @property
@@ -339,6 +355,10 @@ class GUIText(sf.Drawable):
         self.updateOrigin()
         
     @property
+    def local_bounds(self):
+        return self.txt.local_bounds
+        
+    @property
     def bounds(self):
         return self.txt.global_bounds
         
@@ -348,10 +368,10 @@ class GUIText(sf.Drawable):
     def draw(self, target, states):
         color = self.txt.color
         pos = self.txt.position
-        if self.outline_color != None:
-            self.txt.color = self.outline_color
+        if self.text_outline_color != None:
+            self.txt.color = self.text_outline_color
             for xoff, yoff in [(-1,0), (1,0), (0,-1), (0,1), (-1,-1), (-1,1), (1,-1), (1,1)]:
-                self.txt.position = (pos.x + xoff*self.outline_thickness, pos.y + yoff*self.outline_thickness)
+                self.txt.position = (pos.x + xoff*self.text_outline_thickness, pos.y + yoff*self.text_outline_thickness)
                 self.updateOrigin()
                 target.draw(self.txt)
             self.txt.color = color
@@ -359,6 +379,139 @@ class GUIText(sf.Drawable):
             self.updateOrigin()
         target.draw(self.txt, sf.RenderStates(shader=self.outline_shader))
 
+class FrameText(GUIText):
+    def __init__(self, s, rect, charSize=20, textColor=sf.Color.WHITE, backColor=sf.Color(0,0,0,180), outlineThickness=3, outlineColor=sf.Color.BLUE, align=GUIText.HOR_LEFT):
+        self.input_area = sf.RectangleShape(rect.size)
+        self.input_area.position = rect.position
+        self.input_area.fill_color = backColor
+        self.input_area.outline_thickness = outlineThickness
+        self.input_area.outline_color = outlineColor
+        GUIText.__init__(self, s, (self.input_area.position.x+5, self.input_area.position.y+(rect.size.y-charSize)/2), align, textColor, charSize)
+        self._active = True
+        self.onActiveChanged = None
+     
+    @property
+    def active(self):
+        return self._active
+    @active.setter
+    def active(self, act):
+        self._active = act
+        if self.onActiveChanged != None:
+            self.onActiveChanged(self)
+     
+    @property
+    def position(self):
+        return self.input_area.position
+    @position.setter
+    def position(self, pos):
+        self.input_area.position = pos if type(pos) == type([]) or type(pos) == type(()) else pos.toSFML()
+        self.txt.position = (self.input_area.position.x+5, self.input_area.position.y+(self.input_area.size.y-self.char_size)/2)
+        self.updateOrigin()
+        
+    @property
+    def outline_color(self):
+        return self.input_area.outline_color
+    @outline_color.setter
+    def outline_color(self, cor):
+        self.input_area.outline_color = cor
+        
+    @property
+    def local_bounds(self):
+        return self.input_area.local_bounds
+    @property
+    def bounds(self):
+        return self.input_area.global_bounds
+        
+    def updateOrigin(self):
+        GUIText.updateOrigin(self)
+        if self.align == GUIText.HOR_LEFT:
+            self.txt.position = (self.input_area.position.x+5, self.input_area.position.y+(self.input_area.size.y-self.char_size)/2)
+        elif self.align == GUIText.HOR_RIGHT:
+            self.txt.position = (self.input_area.position.x+self.input_area.size.x-5, self.input_area.position.y+(self.input_area.size.y-self.char_size)/2)
+        elif self.align == GUIText.HOR_CENTER:
+            self.txt.position = (self.input_area.position.x+self.input_area.size.x/2, self.input_area.position.y+(self.input_area.size.y-self.char_size)/2)
+        elif self.align == GUIText.CENTER:
+            self.txt.position = (self.input_area.position.x+self.input_area.size.x/2, self.input_area.position.y+(self.input_area.size.y-self.char_size)/2)
+        elif self.align == GUIText.HOR_LEFT_VER_CENTER:
+            self.txt.position = (self.input_area.position.x+5, self.input_area.position.y+(self.input_area.size.y-self.char_size)/2)
+        
+    def draw(self, target, states):
+        target.draw(self.input_area, states)
+        GUIText.draw(self, target, states)
+     
+class TextEntry(FrameText):
+    def __init__(self, s, rect, charSize=20, textColor=sf.Color.WHITE, backColor=sf.Color(0,0,0,180), 
+                 outlineThickness=3, outlineColor=sf.Color.BLUE, cursorColor=sf.Color.WHITE, align=GUIText.HOR_LEFT):
+        FrameText.__init__(self, "", rect, charSize, textColor, backColor, outlineThickness, outlineColor, align)
+        self.cursor = sf.RectangleShape((2, charSize))
+        self.cursor.fill_color = cursorColor
+        self.line = s
+        self.line_index = len(s)
+        self.max_text_length = -1
+        
+    @property
+    def line_index(self):
+        return self._lineindex
+    @line_index.setter
+    def line_index(self, i):
+        self._lineindex = i
+        if self._lineindex < 0:
+            self._lineindex = 0
+        if self._lineindex > len(self.line):
+            self._lineindex = len(self.line)
+        
+    @property
+    def text(self):
+        return self.line
+    @text.setter
+    def text(self, s):
+        self.line = s
+        if self.max_text_length > 0 and len(s) > self.max_text_length:
+            self.line = s[:self.max_text_length]
+        self.line_index = len(s)
+
+    def processInput(self, e):
+        if type(e) == sf.TextEvent:
+            # So ENTER(13)/BACKSPACE(8)/TAB(9) aparentemente podem vir aqui.
+            if e.unicode == ord('\r') or e.unicode == ord('\n'): #ENTER \n ou \r
+                #if len(self.line) > 0:
+                #    self.line = ""
+                #    self.line_index = 0
+                pass #TODO: for now, do nothing on enter here (just prevent it from turning into char in text)
+            elif e.unicode == ord('\b'): #BACKSPACE   \b
+                if len(self.line) > 0:
+                    self.line = self.line[:self.line_index-1] + self.line[self.line_index:]
+                    self.line_index -= 1
+            elif self.max_text_length == -1 or (self.max_text_length > 0 and len(self.line) < self.max_text_length):
+                try:
+                    c = str(chr(e.unicode))
+                    c = c.encode("ascii", "ignore")
+                    self.line = self.line[:self.line_index] + c + self.line[self.line_index:]
+                    self.line_index += 1
+                except:
+                    traceback.print_exc(file=sys.stderr)
+        elif type(e) == sf.KeyEvent and e.released:
+            if e.code == sf.Keyboard.LEFT:
+                self.line_index -= 1
+            elif e.code == sf.Keyboard.RIGHT:
+                self.line_index += 1
+            elif e.code == sf.Keyboard.DELETE:
+                if len(self.line) > 0:
+                    self.line = self.line[:self.line_index] + self.line[self.line_index+1:]
+            elif e.code == sf.Keyboard.HOME:
+                self.line_index = 0
+            elif e.code == sf.Keyboard.END:
+                self.line_index = len(self.line)
+            
+    def draw(self, target, states):
+        self._base_set_text(self.line)
+        FrameText.draw(self, target, states)
+        if self.active:
+            size = getTextSize(self.line[:self._lineindex], self.char_size)
+            txtpos = self.txt.position - self.txt.origin
+            self.cursor.position = txtpos.x + size - 1, txtpos.y + 1
+            target.draw(self.cursor, states)
+    
 class PlayerHUD(sf.Drawable):
     RIGHT = 0
     LEFT = 1
@@ -372,15 +525,15 @@ class PlayerHUD(sf.Drawable):
         self.icons = []
         self.texts = []
         char_size = 18.0
-        self.icons.append(sf.Sprite(game.Game.images.ammo))
-        self.texts.append(sf.Text("", game.font, character_size=char_size))
-        self.icons.append(sf.Sprite(game.Game.images.bomb))
-        self.texts.append(sf.Text("", game.font, character_size=char_size))
-        self.icons.append(sf.Sprite(game.Game.images.speed))
-        self.texts.append(sf.Text("", game.font, character_size=char_size))
-        self.icons.append(sf.Sprite(game.Game.images.points))
-        self.texts.append(sf.Text("", game.font, character_size=char_size))
-        yoff = 0
+        self.plaName = GUIText(player.name, pos, GUIText.HOR_LEFT if align==PlayerHUD.LEFT else GUIText.HOR_RIGHT, sf.Color.BLACK, char_size)
+        self.plaName.text_outline_color = sf.Color.RED
+        self.plaName.text_outline_thickness = 1
+        
+        iconImages = [game.Game.images.ammo, game.Game.images.bomb, game.Game.images.speed, game.Game.images.points]
+        for iconimg in iconImages:
+            self.icons.append(sf.Sprite(iconimg))
+            self.texts.append(sf.Text("", game.font, character_size=char_size))
+        yoff = char_size + 2 #pla name comes before
         for icon, text in zip(self.icons, self.texts):
             text.color = sf.Color.WHITE
             icon.ratio = (char_size*2/icon.texture.width, char_size*2/icon.texture.height)
@@ -417,107 +570,17 @@ class PlayerHUD(sf.Drawable):
         
         for icon, text, value in zip(self.icons, self.texts, playerValues):
             text.string = value
-            #text.origin = (text.global_bounds.left + text.global_bounds.width, text.global_bounds.top)
-            text.position = (icon.global_bounds.left - 3 - text.global_bounds.width, text.position.y)
+            if self.align == PlayerHUD.RIGHT:
+                #text.origin = (text.global_bounds.left + text.global_bounds.width, text.global_bounds.top)
+                text.position = (icon.global_bounds.left - 3 - text.global_bounds.width, text.position.y)
         
     def draw(self, target, states):
+        target.draw(self.plaName, states)
         staout = sf.RenderStates(shader=self.outline)
         for icon, text in zip(self.icons, self.texts):
             target.draw(icon, staout)
             target.draw(text)
-        
-class TextEntry(sf.Drawable):
-    def __init__(self, s, rect, charSize=20, textColor=sf.Color.WHITE, backColor=sf.Color(0,0,0,180), outlineThickness=3, outlineColor=sf.Color.BLUE, cursorColor=sf.Color.WHITE):
-        sf.Drawable.__init__(self)
-        self.input_area = sf.RectangleShape(rect.size)
-        self.input_area.position = rect.position
-        self.input_area.fill_color = backColor
-        self.input_area.outline_thickness = outlineThickness
-        self.input_area.outline_color = outlineColor
-        self.txtui = GUIText("", (self.input_area.position.x+5, self.input_area.position.y+(rect.size.y-charSize)/2), GUIText.HOR_LEFT, textColor, charSize)
-        self.cursor = sf.RectangleShape((2, charSize))
-        self.cursor.fill_color = cursorColor
-        self.line = s
-        self.line_index = len(s)
-        self.active = True
-        self.max_text_length = -1
-        
-    @property
-    def position(self):
-        return self.txtui.position
-    @position.setter
-    def position(self, pos):
-        self.txtui.position = pos
-        
-    @property
-    def line_index(self):
-        return self._lineindex
-    @line_index.setter
-    def line_index(self, i):
-        self._lineindex = i
-        if self._lineindex < 0:
-            self._lineindex = 0
-        if self._lineindex > len(self.line):
-            self._lineindex = len(self.line)
-        size = getTextSize(self.line[:self._lineindex], self.txtui.txt.character_size)
-        self.cursor.position = self.position.x + size - 2, self.position.y
-        
-    @property
-    def text(self):
-        return self.line
-    @text.setter
-    def text(self, s):
-        self.line = s
-        if self.max_text_length > 0 and len(s) > self.max_text_length:
-            self.line = s[:self.max_text_length]
-        self.line_index = len(s)
-    
-    @property
-    def outline_color(self):
-        return self.input_area.outline_color
-    @outline_color.setter
-    def outline_color(self, cor):
-        self.input_area.outline_color = cor
-    
-    def processInput(self, e):
-        if type(e) == sf.TextEvent:
-            # So ENTER(13)/BACKSPACE(8)/TAB(9) aparentemente podem vir aqui.
-            if e.unicode == ord('\r') or e.unicode == ord('\n'): #ENTER \n ou \r
-                #if len(self.line) > 0:
-                #    self.line = ""
-                #    self.line_index = 0
-                pass #TODO: for now, do nothing on enter here (just prevent it from turning into char in text)
-            elif e.unicode == ord('\b'): #BACKSPACE   \b
-                if len(self.line) > 0:
-                    self.line = self.line[:self.line_index-1] + self.line[self.line_index:]
-                    self.line_index -= 1
-            elif self.max_text_length == -1 or (self.max_text_length > 0 and len(self.line) < self.max_text_length):
-                try:
-                    c = str(chr(e.unicode))
-                    c = c.encode("ascii", "ignore")
-                    self.line = self.line[:self.line_index] + c + self.line[self.line_index:]
-                    self.line_index += 1
-                except:
-                    traceback.print_exc(file=sys.stderr)
-        elif type(e) == sf.KeyEvent and e.released:
-            if e.code == sf.Keyboard.LEFT:
-                self.line_index -= 1
-            elif e.code == sf.Keyboard.RIGHT:
-                self.line_index += 1
-            elif e.code == sf.Keyboard.DELETE:
-                if len(self.line) > 0:
-                    self.line = self.line[:self.line_index] + self.line[self.line_index+1:]
-            elif e.code == sf.Keyboard.HOME:
-                self.line_index = 0
-            elif e.code == sf.Keyboard.END:
-                self.line_index = len(self.line)
-            
-    def draw(self, target, states):
-        target.draw(self.input_area, states)
-        self.txtui.set_text(self.line)
-        target.draw(self.txtui, states)
-        if self.active:
-            target.draw(self.cursor, states)
+   
     
 ################################################################
 # Console

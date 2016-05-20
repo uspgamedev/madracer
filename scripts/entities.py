@@ -16,7 +16,7 @@ class BaseEntity:
         BaseEntity.entCount += 1
         return BaseEntity.entCount
     
-    def __init__(self, type, x, y, w, h, color, speed, hp, points):
+    def __init__(self, type, x, y, w, h, color, speed, hp, points, useOutline=False):
         self.type = type
         self.pos = Vector(x,y)
         self.size = Vector(w,h)
@@ -41,11 +41,11 @@ class BaseEntity:
         self.curbar.fill_color = sf.Color.RED
         
         self.shaders = [None]
-        #if self.spr != None:
-        #    self.shaders[0] = sf.Shader.from_file(fragment="scripts/outline.frag")
-        #    self.shaders[0].set_currenttexturetype_parameter("texture")
-        #    self.shaders[0].set_2float_parameter("stepSize", 5.0/self.spr.texture.width, 5.0/self.spr.texture.height)
-        #    self.shaders[0].set_color_parameter("outlineColor", sf.Color.GREEN)
+        if self.spr != None and useOutline:
+            self.shaders[0] = sf.Shader.from_file(fragment="scripts/outline.frag")
+            self.shaders[0].set_currenttexturetype_parameter("texture")
+            self.shaders[0].set_2float_parameter("stepSize", 5.0/self.spr.texture.width, 5.0/self.spr.texture.height)
+            self.shaders[0].set_color_parameter("outlineColor", self.color)
 
     def draw(self, window):
         self.drawEntity(window)
@@ -132,9 +132,10 @@ class BaseEntity:
 
 #************* Player ****************
 class Player(BaseEntity):
-    def __init__(self, x, y, name, input_index):
-        BaseEntity.__init__(self, 'player', x, y, 32, 60, sf.Color.GREEN, 4, 150, 0)
+    def __init__(self, x, y, plaID, color, name, input_preset, inputID, useOutline):
+        BaseEntity.__init__(self, 'player', x, y, 32, 60, color, 4, 150, 0, useOutline)
         self.name = name
+        self.player_id = plaID
         self.bombs = 3
         self.max_shots = 25
         self.shots_available = self.max_shots
@@ -146,11 +147,13 @@ class Player(BaseEntity):
         self.shot_speed = 15
         self.points = 0
         self.turret = Turret(self)
-        self.hud = PlayerHUD(self, (Game.window.view.size.x, 5))
-        self.input_index = input_index
-        self.input = input.available_inputs[self.input_index](self)
-        if not self.input.valid():
-            self.changeInput(False)
+        plaHudX = Game.window.view.size.x if plaID%2==0 else 0
+        plaHudY = 5 if plaID<2 else Game.window.view.size.y - 190
+        self.hud = PlayerHUD(self, (plaHudX, plaHudY), PlayerHUD.RIGHT if plaID%2==0 else PlayerHUD.LEFT)
+        #self.input_index = input_index
+        self.input = input.InputMethod(self, input_preset, inputID) #input.available_inputs[self.input_index](self)
+        #if not self.input.valid():
+        #    self.changeInput(False)
         self.paused = False #to facilitate input method checking if game is paused (and by which player)
         self.speed_level = 1.0
         
@@ -206,12 +209,19 @@ class Player(BaseEntity):
             Game.entities.append(bomb)
 
     def collidedWith(self, ent):
+        if ent.type == 'player':
+            CreateVehicleCollision(self, ent)
+            dir = self.center() - ent.center()
+            dir.normalize()
+            self.pos = self.pos + dir*(2*self.speed())
+            return
         ent.collidedWith(self)
 
     def onDeath(self):
         CreateVehicleExplosion(self)
 
     def changeInput(self, update_graphics=True):
+        return
         input_graphics_params = self.input.graphics_params
         while (True):
             self.input_index = (self.input_index+1) % len(input.available_inputs)
@@ -499,11 +509,11 @@ class Bomb(BaseEntity):
         self.lifetime = 1.0
         
         self.countdown_text = GUIText("-", self.pos, GUIText.CENTER, sf.Color.RED, 20)
-        self.countdown_text.txt.style = sf.Text.BOLD
+        self.countdown_text.style = sf.Text.BOLD
 
     def draw(self, window):
         self.drawEntity(window)
-        self.countdown_text.set_text( "%.1f" % (self.lifetime) )
+        self.countdown_text.text = "%.1f" % (self.lifetime) 
         self.countdown_text.position = self.center()
         window.draw(self.countdown_text)
 

@@ -59,10 +59,15 @@ class InputManager(object):
                 self.presets = pickle.load(fh)
         except:
             self.presets = {}
+        self.preset_queue = self.presets.keys()
+        self.preset_queue.sort()
+        sf.Joystick.update()
+        self.joyid_queue = self.ConnectedJoystickIDs()
         
     def AddPreset(self, preset):
         if self.HasPreset(preset.name) or len(preset.valid()) > 0: return
         self.presets[preset.name] = preset
+        self.preset_queue.append(preset.name)
         self.SavePresets()
     
     def DeletePreset(self, preset_name):
@@ -81,9 +86,33 @@ class InputManager(object):
         keys.sort()
         return keys
         
+    def PopPreset(self):
+        if len(self.preset_queue) <= 0: return None
+        return self.presets[self.preset_queue.pop(0)]
+    def PushPreset(self, preset_name):
+        if not preset_name in self.presets or preset_name in self.preset_queue: 
+            return
+        self.preset_queue.append(preset_name)
+        
     def ConnectedJoystickIDs(self):
         return [id for id in xrange(sf.Joystick.COUNT) if sf.Joystick.is_connected(id)]
+        
+    def PopJoyID(self):
+        if len(self.joyid_queue) <= 0: return None
+        return self.joyid_queue.pop(0)
+    def PushJoyID(self, id):
+        if not id in self.ConnectedJoystickIDs() or id in self.joyid_queue: 
+            return
+        self.joyid_queue.append(id)
     
+    def processEvent(self, e):
+        if type(e) == sf.JoystickConnectEvent:
+            id_in_queue = e.joystick_id in self.joyid_queue
+            if e.connected and not id_in_queue:
+                self.joyid_queue.append(e.joystick_id)
+            elif e.disconnected and id_in_queue:
+                self.joyid_queue.remove(e.joystick_id)
+                
 class Binding(object):
     DEVICE_MOUSE_KEYBOARD = 0
     DEVICE_JOYSTICK = 1

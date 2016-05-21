@@ -178,17 +178,17 @@ class Binding(object):
             s += code_to_name[self.attrs['code']]
             return s
         elif self.type == sf.MouseWheelEvent:
-            return "Mouse Wheel (%s)" % (getSignStr(self.attrs['delta']))
+            return "M-Wheel (%s)" % (getSignStr(self.attrs['delta']))
         elif self.type == sf.MouseButtonEvent:
             code_to_name = dict( [(v,k) for k,v in sf.Mouse.__dict__.items()] )
             buttcode = self.attrs['button']
             if buttcode in code_to_name:
-                return "Mouse "+code_to_name[buttcode]
-            return "Mouse Button "+str(buttcode)
+                return "M-"+code_to_name[buttcode]
+            return "M-Button "+str(buttcode)
         elif self.type == sf.JoystickMoveEvent:
-            return "GamePad AXIS %s (%s)" % (self.attrs['axis'], getSignStr(self.attrs['position']))
+            return "AXIS %s (%s)" % (self.attrs['axis'], getSignStr(self.attrs['position']))
         elif self.type == sf.JoystickButtonEvent:
-            return "GamePad Button "+str(self.attrs['button'])
+            return "Button "+str(self.attrs['button'])
         return "<UNRECOGNIZED>"
     
     def device_type(self):
@@ -349,6 +349,11 @@ class InputMethod(sf.Drawable):
         return dir
         
     def processInput(self, e):
+        if self.device_type() == Binding.DEVICE_JOYSTICK and type(e) == sf.JoystickConnectEvent:
+            if self.graphics_enabled():
+                self.updateGraphics(*self.graphics_params)
+            
+    
         if not self.valid():    return
         cmd = self.processBindings(e)
         if cmd == None: return
@@ -358,16 +363,17 @@ class InputMethod(sf.Drawable):
                 self.player.release_bomb()
             elif cmd == InputMethod.SHOOT_BOMB:
                 self.player.shoot_bomb()
-            #elif cmd == InputMethod.FIRE:
-            #    self.try_fire = not self.try_fire
             
         if cmd in [InputMethod.CLOSE, InputMethod.TOGGLE_FULLSCREEN, InputMethod.TOGGLE_FPS_DISPLAY, InputMethod.PAUSE]:
-            Game.loop_commands.append(cmd)
+            Game.loop_commands[cmd] = self.player
         elif cmd == InputMethod.CHANGE_INPUT:
             self.player.changeInput()
         
     def update(self, dt):
-        if not self.valid(): return
+        if not self.valid():
+            if not self.player.paused:
+                Game.loop_commands[InputMethod.PAUSE] = self.player
+            return
         self.target = self.update_target()
         target_dir = self.target_dir()
         self.try_fire = self.action_value(InputMethod.FIRE)
@@ -382,7 +388,7 @@ class InputMethod(sf.Drawable):
             dir.normalize()
         return dir
         
-    def valid(self): ###FIXME
+    def valid(self):
         # if this input method can be used. If not, Game will skip it when changing
         # inputs. Particularly needed for "optional" plug-and-play methods such as
         # gamepads.
@@ -408,14 +414,45 @@ class InputMethod(sf.Drawable):
         #text player keys: direita, right-align, branco *
         self.texts.append(GUIText(self.name, (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
         ckY = self.texts[-1].bounds.bottom + 7
-        for cmd, key in self.command_list():
-            self.texts.append(GUIText(cmd, (bounds.left+2, ckY), GUIText.HOR_LEFT, names_color, 18))
-            if show_values_below:
-                ckY += 18
-            self.texts.append(GUIText(key, (bounds.right-2, ckY), GUIText.HOR_RIGHT, values_color, 18))
-            ckY += 24
-            if not show_values_below:
-                ckY += 3
+        
+        if self.valid():
+            cmdNames = {
+                InputMethod.MOVE_LEFT: 'Move Left',
+                InputMethod.MOVE_RIGHT: 'Move Right',
+                InputMethod.MOVE_UP: 'Move Up',
+                InputMethod.MOVE_DOWN: 'Move Down',
+                InputMethod.FIRE: 'Fire',
+                InputMethod.SHOOT_BOMB: 'Shoot Bomb',
+                InputMethod.RELEASE_BOMB: 'Release Bomb',
+                InputMethod.PAUSE: 'Pause',
+                InputMethod.TOGGLE_FULLSCREEN: 'Fullscreen',
+                InputMethod.CHANGE_INPUT: 'Change Input',
+                InputMethod.CLOSE: 'Close',
+                InputMethod.TOGGLE_FPS_DISPLAY: 'FPS Display',
+            }
+            txtData = [(cmdNames[cmd], str(bind)) for cmd, bind in self.bindings.items()]
+            target_types = {
+                InputMethod.AUTO_TARGETING:   "Auto",
+                InputMethod.POINT_TARGETING:   "Mouse",
+                InputMethod.DIRECTIONAL_TARGETING:   "Directional"
+            }
+            txtData.append( ("Targeting", target_types[self.targeting_type]) )
+            if self.targeting_type == InputMethod.DIRECTIONAL_TARGETING:
+                txtData += [("Target " + cmd[0].upper() + cmd[1:], str(bind)) for cmd, bind in self.targeting_bindings.items()]
+            
+            for cmd, value in txtData:
+                self.texts.append(GUIText(cmd, (bounds.left+2, ckY), GUIText.HOR_LEFT, names_color, 18))
+                if show_values_below:
+                    ckY += 18
+                self.texts.append(GUIText(value, (bounds.right-2, ckY), GUIText.HOR_RIGHT, values_color, 18))
+                ckY += 24
+                if not show_values_below:
+                    ckY += 3
+        else:
+            ckY += 10
+            self.texts.append(GUIText("INVALID METHOD", (bounds.left+bounds.width/2, ckY), GUIText.HOR_CENTER, names_color, 18))
+            ckY += 32
+            self.texts.append(GUIText("Joystick Disconnected", (bounds.left+bounds.width/2, ckY), GUIText.HOR_CENTER, values_color, 18))
             
     def drawPlayerTarget(self, window, states):
         if self.target == None: return
@@ -456,10 +493,10 @@ class InputMethod(sf.Drawable):
             window.draw(self.targetDirDisplay)
     
     def draw(self, target, states):
-        if not self.valid():    return
-        if self.target_dir() != None:
-            self.drawPlayerTarget(target, states)
-        self.drawTargeting(target, states)
+        if self.valid():
+            if self.target_dir() != None:
+                self.drawPlayerTarget(target, states)
+            self.drawTargeting(target, states)
         for text in self.texts:
             target.draw(text, states)
       
@@ -502,5 +539,7 @@ class InputMethod(sf.Drawable):
                 return query[0].entity
         return None
             
-            
+    def device_type(self):
+        return self.bindings.values()[0].device_type()
+        
 InputManager = InputManager()

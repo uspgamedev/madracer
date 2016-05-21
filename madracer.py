@@ -45,7 +45,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
             else:
                 Game.processInput(event)
         
-        for cmd in Game.loop_commands:
+        for cmd, player in Game.loop_commands.items():
             if cmd == input.InputMethod.TOGGLE_FULLSCREEN:
                 fullscreen = not fullscreen
                 if fullscreen:
@@ -61,7 +61,7 @@ def executeGame(fullscreen, cheatsEnabled, vsync, stretch, input_index, superhot
                 updateFPStextPos()
             elif cmd == input.InputMethod.TOGGLE_FPS_DISPLAY:
                 showFps = not showFps
-        Game.loop_commands = []
+        Game.loop_commands = {}
         
         window.clear() # clear screen
 

@@ -127,9 +127,13 @@ class HighScores(sf.Drawable):
             with open("./highscores", 'rb') as fh:
                 self.scores = pickle.load(fh)
         except:
-            self.scores = [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)]
+            self.scores = {1: [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)],
+                           2: [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)],
+                           3: [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)],
+                           4: [HighscoreEntry('-----', 0, 1.0) for i in xrange(10)]
+                          }
         
-    def updateGraphics(self, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
+    def updateGraphics(self, hsID, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
         self.texts = []
         rect = sf.RectangleShape(bounds.size)
         rect.position = bounds.position
@@ -138,10 +142,10 @@ class HighScores(sf.Drawable):
         rect.outline_color = title_color
         self.texts.append(rect)
         #text highscore: esquerda, left-align, branco *
-        self.texts.append(GUIText("Highscores:", (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
+        self.texts.append(GUIText("Highscores (%i players):"%(hsID), (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
         #text HSE points: esquerda, right-align, branco *
         hsY = self.texts[-1].bounds.bottom + 7
-        for i, hse in enumerate(self.scores):
+        for i, hse in enumerate(self.scores[hsID]):
             #text HSE names: esquerda, left-align, amarelado *
             hsName = str(i+1)+': '+hse.name
             self.texts.append(GUIText(hsName, (bounds.left+2, hsY), GUIText.HOR_LEFT, names_color, 18))
@@ -155,20 +159,33 @@ class HighScores(sf.Drawable):
             if not show_values_below:
                 hsY += 3
         
-    def InsertScore(self, name, points, speedLvl):
-        hs_index = self.getHSindex(points)
+    def InsertScore(self, players):
+        #self.players[0].name, round(self.players[0].points), self.players[0].speed_level
+        
+        N = len(players)
+        def comp(p1, p2):
+            diff = p2.points - p1.points
+            if diff != 0:
+                return diff/abs(diff)
+            return 0
+        players.sort(comp)
+        name = ";".join([pla.name for pla in players])
+        points = sum([pla.points for pla in players])
+        speedLvl = max([pla.speed_level for pla in players])
+    
+        hs_index = self.getHSindex(N, points)
         if hs_index >= 0:
-            self.scores.pop()
-            self.scores.insert(hs_index, HighscoreEntry(name, points, speedLvl) )
+            self.scores[N].pop()
+            self.scores[N].insert(hs_index, HighscoreEntry(name, points, speedLvl) )
             self.save()
         
     def save(self):
         with open("./highscores", 'wb') as fh:
             pickle.dump(self.scores, fh)
             
-    def getHSindex(self, points):
+    def getHSindex(self, id, points):
         hs_index = -1
-        for i, hse in enumerate(self.scores):
+        for i, hse in enumerate(self.scores[id]):
             if points > hse.points:
                 hs_index = i
                 break
@@ -229,11 +246,10 @@ class LocalGame(GameState):
         self.music.volume = 80
         sf.Listener.set_direction((0,1,0))
         
-        self.paused = False
         self.cheated = False
         self.generate_entities = True
         
-        plaX = [200,300,400,500] #FIXME
+        plaX = [200,400,600,800] #FIXME
         plaColors = [sf.Color.GREEN, sf.Color.BLUE, sf.Color.RED, sf.Color.MAGENTA]
         self.players = []
         for i, (plaName, plaPreset, plaInputID) in enumerate(player_data):
@@ -265,7 +281,7 @@ class LocalGame(GameState):
         for gen in self.generators:
             gen.time_to_create = (gen.interval[1] - gen.interval[0])*random.random() + gen.interval[0]
             
-        self.pause_screen = PauseScreen()
+        self.pause_screen = PauseScreen(self.players)
         
     def game_finished(self):
         for player in self.players:
@@ -290,12 +306,13 @@ class LocalGame(GameState):
             createBar(Game.track_pos.x+Game.track_area.x+3, 3, sf.graphics.Color(112,0,0,255))]
                 
     def update(self, dt):
-        if not self.game_finished() and not self.paused:
+        if not self.game_finished():
             # update game stats
             self.speed_level += dt/60.0 #speed_level will increase by 1 each 60 secs
             for player in self.players:
-                player.points += dt #+1 point per second
-                player.speed_level = self.speed_level
+                if player.hp > 0:
+                    player.points += dt #+1 point per second
+                    player.speed_level = self.speed_level
             
             listenerPos = self.players[0].center() - Game.track_pos #FIXME
             listenerPos = (listenerPos / Game.track_area)*100
@@ -344,7 +361,8 @@ class LocalGame(GameState):
                 if ent.hp <= 0:
                     ent.onDeath()
                     for player in self.players:
-                        player.points += ent.point_value
+                        if player.hp > 0:  #FIXME: points should go to a single player - the one who killed this ent
+                            player.points += ent.point_value
                     self.entities.remove(ent)
             
             # sort effect by priority
@@ -361,7 +379,10 @@ class LocalGame(GameState):
                     self.effects.remove(eff)
 
             self.track.update(self.speed_level)
-        elif self.game_finished():
+            
+            #check if paused
+            self.checkIfPlayerPaused()
+        else:
             return False
         return True
         
@@ -372,13 +393,13 @@ class LocalGame(GameState):
         
     def processInput(self, e):
         for player in self.players:
-            player.input.processInput(e)
+            if player.hp > 0:
+                player.input.processInput(e)
         
         if type(e) is sf.FocusEvent and e.lost:
-            self.pause_screen.pushToGame(self.players[0])
+            self.pause_screen.pushToGame(None)
             return
-        if input.InputMethod.PAUSE in Game.loop_commands:
-            self.pause_screen.pushToGame(self.players[0]) #FIXME
+        self.checkIfPlayerPaused()
         
         if type(e) is sf.KeyEvent:
             if not e.released:
@@ -417,6 +438,11 @@ class LocalGame(GameState):
                         self.generate_entities = not self.generate_entities
                         self.cheated = True
   
+    def checkIfPlayerPaused(self):
+        if input.InputMethod.PAUSE in Game.loop_commands:
+            pla = Game.loop_commands.pop(input.InputMethod.PAUSE)
+            self.pause_screen.pushToGame(pla)
+  
     def draw(self, target, states):
         target.draw(self.track, states)
         
@@ -436,38 +462,63 @@ class LocalGame(GameState):
             player.drawUI(target)
 
 class PauseScreen(GameState):
-    def __init__(self):
+    def __init__(self, players):
         GameState.__init__(self)
+        self.players = players
+        self.paused_player = None
         width, height = Game.window.view.size
+        self.whoPaused = GUIText("nobody", (width/2, height/2 - 25), GUIText.CENTER, sf.Color.BLACK, 18)
+        self.whoPaused.text_outline_color = sf.Color.RED
+        self.whoPaused.text_outline_thickness = 1
+        
         self.pausedTxt = GUIText("PAUSED", (width/2, height/2), GUIText.CENTER, sf.Color.BLACK, 40)
         self.pausedTxt.style = sf.Text.BOLD
         self.pausedTxt.text_outline_color = sf.Color.RED
         self.pausedTxt.text_outline_thickness = 1
         
     def pushToGame(self, player):
-        self.player = player
-        self.player.paused = True
-        Game.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
+        Game.highscores.updateGraphics(len(self.players), sf.Rectangle((100, 120),(220,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
                                            sf.Color(0,0,0,180), 3)
-        self.player.input.updateGraphics(sf.Rectangle((680, 120),(200,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
+        if player != None:
+            player.input.updateGraphics(sf.Rectangle((680, 120),(220,475)), False, sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE,
                                       sf.Color(0,0,0,180), 3)
+            self.paused_player = player
+            self.paused_player.paused = True
+            self.whoPaused.text = player.name
+        else:
+            self.paused_player = True
+            self.whoPaused.text = ""
         GameState.pushToGame(self)
         
     def onPopFromGame(self):
-        self.player.input.disableGraphics()
+        if type(self.paused_player) != bool:
+            self.paused_player.input.disableGraphics()
         
     def update(self, dt):
-        return self.player.paused
+        if type(self.paused_player) != bool:
+            return self.paused_player.paused
+        return self.paused_player
         
     def processInput(self, e):
-        self.player.input.processInput(e)
+        if type(self.paused_player) != bool:
+            self.paused_player.input.processInput(e)
+        else:
+            for pla in self.players:
+                pla.input.processInput(e)
         if input.InputMethod.PAUSE in Game.loop_commands:
-            self.player.paused = False
-            Game.loop_commands.remove(input.InputMethod.PAUSE)
+            if type(self.paused_player) != bool:
+                self.paused_player.paused = False
+            else:
+                self.paused_player = False
+            Game.loop_commands.pop(input.InputMethod.PAUSE)
         if type(e) is sf.FocusEvent:
-            self.player.paused = e.lost
+            if type(self.paused_player) != bool:
+                self.paused_player.paused = e.lost
+            else:
+                self.paused_player = e.lost
         
     def draw(self, target, states):
+        target.draw(self.whoPaused, states)
         target.draw(self.pausedTxt, states)
         target.draw(Game.highscores, states)
 
@@ -492,12 +543,12 @@ class GameOverScreen(GameState):
         self.restartTxt.text_outline_color = sf.Color.RED
         self.restartTxt.text_outline_thickness = 1
         
-        Game.highscores.updateGraphics(sf.Rectangle((120, 120),(200,475)), False, sf.Color.RED, 
+        Game.highscores.updateGraphics(len(players), sf.Rectangle((100, 120),(220,475)), False, sf.Color.RED, 
                                        sf.graphics.Color(160,160,0,255), sf.Color.WHITE, sf.Color(0,0,0,180), 3)
         
     def onPopFromGame(self):
         if not self.cheated:
-            Game.highscores.InsertScore(self.players[0].name, round(self.players[0].points), self.players[0].speed_level)
+            Game.highscores.InsertScore(self.players)
 
     def update(self, dt):
         return self.active
@@ -511,11 +562,11 @@ class GameOverScreen(GameState):
         target.draw(self.gos_spr, states)
         target.draw(Game.highscores, states)
         target.draw(self.gameOverTxt, states)
-        hs_index = Game.highscores.getHSindex(self.players[0].points)
+        hs_index = Game.highscores.getHSindex(len(self.players), sum([pla.points for pla in self.players]))
         if self.cheated:
             self.restartTxt.text = "Press ENTER to return to main menu.\nCheating disables highscores."
         elif hs_index >= 0:
-            self.restartTxt.text = "Press ENTER to return to main menu.\nEntered Highscores@%s!" % (hs_index)
+            self.restartTxt.text = "Press ENTER to return to main menu.\nEntered Highscores in #%s!" % (hs_index)
         target.draw(self.restartTxt, states)
        
 class MainMenuScreen(GameState):
@@ -1044,7 +1095,7 @@ class Game(object):
     def build(self):
         self.track_pos = Vector(100, 0)
         self.track_area = Vector(800, 700)
-        self.loop_commands = []
+        self.loop_commands = {}
         self.console = Console({'game': self})
         self.console.initGraphics(sf.Rectangle((100, 3), (800, 700/2)) )
         
@@ -1136,7 +1187,7 @@ class Game(object):
             if input.InputMethod.CLOSE in self.loop_commands:
                 state = self.states.pop()
                 state.onPopFromGame()
-                self.loop_commands.remove(input.InputMethod.CLOSE)
+                self.loop_commands.pop(input.InputMethod.CLOSE)
         else:
             self.window.close()
 

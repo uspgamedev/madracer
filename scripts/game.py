@@ -566,7 +566,7 @@ class GameOverScreen(GameState):
         if self.cheated:
             self.restartTxt.text = "Press ENTER to return to main menu.\nCheating disables highscores."
         elif hs_index >= 0:
-            self.restartTxt.text = "Press ENTER to return to main menu.\nEntered Highscores in #%s!" % (hs_index)
+            self.restartTxt.text = "Press ENTER to return to main menu.\nEntered Highscores in #%s!" % (hs_index+1)
         target.draw(self.restartTxt, states)
        
 class MainMenuScreen(GameState):

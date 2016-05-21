@@ -135,6 +135,16 @@ class HighScores(sf.Drawable):
         
     def updateGraphics(self, hsID, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
         self.texts = []
+        self.createGraphicsForHS("Highscores (%i players):", hsID, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness)
+    
+    def updateAllGraphics(self, initPos, size, xOffset, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
+        self.texts = []
+        xplus = 0
+        for i in xrange(4):
+            self.createGraphicsForHS("%i Players", i+1, sf.Rectangle((initPos[0]+xplus, initPos[1]), size), show_values_below, title_color, names_color, values_color, background_color, background_border_thickness)
+            xplus += xOffset + size[0]
+    
+    def createGraphicsForHS(self, titleFormat, hsID, bounds, show_values_below, title_color, names_color, values_color, background_color, background_border_thickness):
         rect = sf.RectangleShape(bounds.size)
         rect.position = bounds.position
         rect.fill_color = background_color
@@ -142,7 +152,7 @@ class HighScores(sf.Drawable):
         rect.outline_color = title_color
         self.texts.append(rect)
         #text highscore: esquerda, left-align, branco *
-        self.texts.append(GUIText("Highscores (%i players):"%(hsID), (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
+        self.texts.append(GUIText(titleFormat%(hsID), (bounds.left+bounds.width/2, bounds.top+2), GUIText.HOR_CENTER, title_color, 20))
         #text HSE points: esquerda, right-align, branco *
         hsY = self.texts[-1].bounds.bottom + 7
         for i, hse in enumerate(self.scores[hsID]):
@@ -152,9 +162,12 @@ class HighScores(sf.Drawable):
             if show_values_below:
                 hsY += 18
             self.texts.append(GUIText("%i"%(hse.points), (bounds.right-2, hsY), GUIText.HOR_RIGHT, values_color, 18))
-            hsY += 18
             mins, secs = Game.getTimeFromSpeedLevel(hse.level)
-            self.texts.append(GUIText("%im%is"%(mins,secs), (bounds.right-2, hsY), GUIText.HOR_RIGHT, values_color, 18))
+            if not show_values_below:
+                hsY += 18
+                self.texts.append(GUIText("%im%is"%(mins,secs), (bounds.right-2, hsY), GUIText.HOR_RIGHT, values_color, 18))
+            else:
+                self.texts.append(GUIText("%im%is"%(mins,secs), (bounds.left+2, hsY), GUIText.HOR_LEFT, values_color, 18))
             hsY += 24
             if not show_values_below:
                 hsY += 3
@@ -635,25 +648,18 @@ class MainMenuScreen(GameState):
         
         self.buttons = []
         y += 40
-        start_button = FrameText("Start Game", sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
+        def addButton(name, y):
+            button = FrameText(name, sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
                                 24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
-        start_button.onActiveChanged = buttonActiveChanged
-        start_button.active = False
-        self.buttons.append(start_button)
-        
-        y += 60
-        input_button = FrameText("Create Input Preset", sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
-                                24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
-        input_button.onActiveChanged = buttonActiveChanged
-        input_button.active = False
-        self.buttons.append(input_button)
-        
-        y += 60
-        exit_button = FrameText("Exit", sf.Rectangle((width*.5 - width/8, y), (width/4, 33)),
-                                24, sf.Color.GREEN, sf.Color(100,100,0,255), 3, sf.Color.BLACK, GUIText.HOR_CENTER)
-        exit_button.onActiveChanged = buttonActiveChanged
-        exit_button.active = False
-        self.buttons.append(exit_button)
+            button.onActiveChanged = buttonActiveChanged
+            button.active = False
+            self.buttons.append(button)
+            return 60
+            
+        y += addButton("Start Game", y)
+        y += addButton("Create Input Preset", y)
+        y += addButton("Highscores", y)
+        y += addButton("Exit", y)
         
     @property
     def active_index(self):
@@ -662,8 +668,9 @@ class MainMenuScreen(GameState):
     def active_index(self, i):
         prev = self.get_active_entry()
         self._activeindex = i
-        if self._activeindex < 0:   self._activeindex = 6
-        if self._activeindex > 6:   self._activeindex = 0
+        maxind = len(self.players) + len(self.buttons) - 1
+        if self._activeindex < 0:   self._activeindex = maxind
+        if self._activeindex > maxind:   self._activeindex = 0
         if self._activeindex <= 3:
             prev_hor = self.hor_active_index
             self.hor_active_index = self.hor_active_index
@@ -722,35 +729,15 @@ class MainMenuScreen(GameState):
             if e.code == sf.Keyboard.LEFT and self.active_index <= 3:
                 self.hor_active_index -= 1
             if e.code == sf.Keyboard.RETURN:
-                if self.active_index <= 3:
-                    if self.hor_active_index == 2:
-                        self.handlePresetChange()
-                    elif self.hor_active_index == 3:
-                        self.handleJoystickIDChange()
-                elif self.active_index == 4: #start
-                    self.handleStartGame()
-                elif self.active_index == 5: #create input
-                    self.handleCreateInputPreset()
-                elif self.active_index == 6: #exit
-                    self.active = False
+                self.handleButtons()
         elif type(e) == sf.JoystickMoveEvent:
-            if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1:
+            if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1:
                 self.active_index += int(e.position/abs(e.position))
-            if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1 and self.active_index <= 3:
+            if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1 and self.active_index <= 3:
                 self.hor_active_index += int(e.position/abs(e.position))
         elif type(e) == sf.JoystickButtonEvent and e.released:
             if e.button in range(4):
-                if self.active_index <= 3:
-                    if self.hor_active_index == 2:
-                        self.handlePresetChange(e.joystick_id)
-                    elif self.hor_active_index == 3:
-                        self.handleJoystickIDChange(e.joystick_id)
-                elif self.active_index == 4: #start
-                    self.handleStartGame()
-                elif self.active_index == 5: #create input
-                    self.handleCreateInputPreset()
-                elif self.active_index == 6: #exit
-                    self.active = False
+                self.handleButtons(e.joystick_id)
         elif type(e) == sf.JoystickConnectEvent:
             if e.disconnected and e.joystick_id in self.pla_inputIDs:
                 ind = self.pla_inputIDs.index(e.joystick_id)
@@ -760,7 +747,22 @@ class MainMenuScreen(GameState):
                 self.handleJoystickIDChange(None)
                 self.active_index = prev
                 
-                
+    def handleButtons(self, joyID=None):
+        if self.active_index <= 3:
+            if self.hor_active_index == 2:
+                self.handlePresetChange(e.joystick_id)
+            elif self.hor_active_index == 3:
+                self.handleJoystickIDChange(e.joystick_id)
+        elif self.active_index == 4: #start
+            self.handleStartGame()
+        elif self.active_index == 5: #create input
+            self.handleCreateInputPreset()
+        elif self.active_index == 6: #highscores
+            hsscreen = HighscoresScreen()
+            hsscreen.pushToGame()
+        elif self.active_index == 7: #exit
+            self.active = False
+            
     def handlePresetChange(self, joyID=None):
         preset = input.InputManager.PopPreset()
         if self.presets[self.active_index] != None:
@@ -1060,9 +1062,9 @@ class InputBindingsScreen(GameState):
             if e.code == sf.Keyboard.RETURN and not self.active_index in [self.cmds_order.index('Preset Name'),self.cmds_order.index('Targeting Type')]:
                 self.handleEnter()
         elif type(e) == sf.JoystickMoveEvent:
-            if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1:
+            if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1:
                 self.active_index += int(e.position/abs(e.position))
-            if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1 and self.active_index == self.cmds_order.index('Targeting Type'):
+            if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1 and self.active_index == self.cmds_order.index('Targeting Type'):
                 self.preset.targeting_type += int(e.position/abs(e.position))
                 if self.preset.targeting_type < 0:  self.preset.targeting_type = 0
                 if self.preset.targeting_type > 2:  self.preset.targeting_type = 2
@@ -1085,6 +1087,39 @@ class InputBindingsScreen(GameState):
         target.draw(self.cancel_button, states)
         target.draw(self.errormsg, states)
       
+class HighscoresScreen(GameState):
+    def __init__(self):
+        GameState.__init__(self)
+        self.active = True
+        self.stacktop_draw = True
+        width, height = Game.window.view.size
+        self.track = Track(True)
+                
+        self.title = GUIText("HIGHSCORES", (width/2, 20), GUIText.HOR_CENTER, sf.Color.BLACK, 40)
+        self.title.style = sf.Text.BOLD
+        self.title.text_outline_color = sf.Color.RED
+        self.title.text_outline_thickness = 1
+        
+        Game.highscores.updateAllGraphics((24, 120), (220,500), 24,
+                                            True, 
+                                            sf.Color.RED, sf.graphics.Color(160,160,0,255), sf.Color.WHITE, 
+                                            sf.Color(0,0,0,180), 3)
+
+    def update(self, dt):
+        self.track.update(2.0)
+        return self.active
+        
+    def processInput(self, e):
+        if type(e) in [sf.KeyEvent, sf.JoystickButtonEvent] and e.released:
+            self.active = False
+        
+    def draw(self, target, states):
+        target.draw(self.track, states)
+        target.draw(Game.highscores, states)
+        target.draw(self.title, states)
+        
+    
+    
 ################################################################
 class Game(object):
     fps = 30.0

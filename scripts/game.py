@@ -179,7 +179,7 @@ class HighScores(sf.Drawable):
         def comp(p1, p2):
             diff = p2.points - p1.points
             if diff != 0:
-                return diff/abs(diff)
+                return int(diff/abs(diff))
             return 0
         players.sort(comp)
         name = ";".join([pla.name for pla in players])
@@ -750,9 +750,9 @@ class MainMenuScreen(GameState):
     def handleButtons(self, joyID=None):
         if self.active_index <= 3:
             if self.hor_active_index == 2:
-                self.handlePresetChange(e.joystick_id)
+                self.handlePresetChange(joyID)
             elif self.hor_active_index == 3:
-                self.handleJoystickIDChange(e.joystick_id)
+                self.handleJoystickIDChange(joyID)
         elif self.active_index == 4: #start
             self.handleStartGame()
         elif self.active_index == 5: #create input
@@ -1117,9 +1117,7 @@ class HighscoresScreen(GameState):
         target.draw(self.track, states)
         target.draw(Game.highscores, states)
         target.draw(self.title, states)
-        
-    
-    
+          
 ################################################################
 class Game(object):
     fps = 30.0

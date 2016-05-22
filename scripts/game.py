@@ -550,7 +550,7 @@ class GameOverScreen(GameState):
         self.gameOverTxt.text_outline_color = sf.Color.RED
         self.gameOverTxt.text_outline_thickness = 1
         
-        restxt = "Press ENTER to return to main menu."
+        restxt = "Press any key to return to main menu."
         self.restartTxt = GUIText(restxt, (width/2, height/2 + 40), GUIText.HOR_CENTER, sf.Color.BLACK, 20)
         self.restartTxt.style = sf.Text.BOLD
         self.restartTxt.text_outline_color = sf.Color.RED
@@ -567,9 +567,8 @@ class GameOverScreen(GameState):
         return self.active
         
     def processInput(self, e):
-        if type(e) == sf.KeyEvent and e.released:
-            if e.code == sf.Keyboard.RETURN: #enter
-                self.active = False
+        if type(e) in [sf.KeyEvent, sf.JoystickButtonEvent] and e.released:
+            self.active = False
         
     def draw(self, target, states):
         target.draw(self.gos_spr, states)
@@ -577,9 +576,9 @@ class GameOverScreen(GameState):
         target.draw(self.gameOverTxt, states)
         hs_index = Game.highscores.getHSindex(len(self.players), sum([pla.points for pla in self.players]))
         if self.cheated:
-            self.restartTxt.text = "Press ENTER to return to main menu.\nCheating disables highscores."
+            self.restartTxt.text = "Press any key to return to main menu.\nCheating disables highscores."
         elif hs_index >= 0:
-            self.restartTxt.text = "Press ENTER to return to main menu.\nEntered Highscores in #%s!" % (hs_index+1)
+            self.restartTxt.text = "Press any key to return to main menu.\nEntered Highscores in #%s!" % (hs_index+1)
         target.draw(self.restartTxt, states)
        
 class MainMenuScreen(GameState):
@@ -732,7 +731,7 @@ class MainMenuScreen(GameState):
                 self.handleButtons()
         elif type(e) == sf.JoystickMoveEvent:
             if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1:
-                self.active_index += int(e.position/abs(e.position))
+                self.active_index -= int(e.position/abs(e.position))
             if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1 and self.active_index <= 3:
                 self.hor_active_index += int(e.position/abs(e.position))
         elif type(e) == sf.JoystickButtonEvent and e.released:
@@ -1063,7 +1062,7 @@ class InputBindingsScreen(GameState):
                 self.handleEnter()
         elif type(e) == sf.JoystickMoveEvent:
             if e.axis == sf.Joystick.POV_X and abs(e.position) >= 1:
-                self.active_index += int(e.position/abs(e.position))
+                self.active_index -= int(e.position/abs(e.position))
             if e.axis == sf.Joystick.POV_Y and abs(e.position) >= 1 and self.active_index == self.cmds_order.index('Targeting Type'):
                 self.preset.targeting_type += int(e.position/abs(e.position))
                 if self.preset.targeting_type < 0:  self.preset.targeting_type = 0

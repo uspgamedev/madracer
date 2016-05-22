@@ -128,6 +128,11 @@ class BaseEntity:
         self.last_moved_dir = dir.copy()
         self.pos = self.pos + dir*self.speed()
         return self.limitInRect(Game.track_pos, Game.track_area)
+
+    def __repr__(self):
+        return self.__str__()
+    def __str__(self):
+        return "%s#%i" % (self.type, self.ID)
 #end class BaseCar
 
 #************* Player ****************
@@ -611,7 +616,15 @@ class Dummy(BaseEntity):
     def __init__(self, x, y):
         BaseEntity.__init__(self, 'dummy', x, y, 60, 60, 'black', 0, 1000, 5)
         self.spr = sf.Sprite(Game.images.rock0)
+        
+        self.name_text = GUIText("%s"%(self), self.pos, GUIText.CENTER, sf.Color.RED, 20)
+        self.name_text.style = sf.Text.BOLD
 
+    def draw(self, window):
+        BaseEntity.draw(self, window)
+        self.name_text.position = self.center()
+        window.draw(self.name_text)
+        
     def update(self, dt):
         pass
 

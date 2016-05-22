@@ -204,28 +204,42 @@ def raycastQuery(point, dir, validTargets = ['berserker', 'slinger', 'warrig', '
     hits.sort(comp)
             
     return hits
-    
-def coneQuery(point, dir, angle, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
+
+class ConeQueryType:
+    @staticmethod
+    def DISTANCE_TO_SOURCE(ent, point, dir):
+        return (ent.center() - point).len()
+    @staticmethod
+    def DISTANCE_TO_DIR(ent, point, dir):
+        dist = ent.center() - point
+        angle = abs(dir.angleBetween(dist))
+        return math.sin(angle) * dist.len()
+    @staticmethod
+    def ANGLE_TO_DIR(ent, point, dir):
+        dist = ent.center() - point
+        return abs(dir.angleBetween(dist))
+def coneQuery(point, dir, angle, valueFunc=ConeQueryType.DISTANCE_TO_SOURCE, validTargets = ['berserker', 'slinger', 'warrig', 'rigturret', 'dummy']):
     hits = []
     if dir.x == 0 and dir.y == 0:
         return hits
-    
+    print "----------CONE QUERY-----------------"
     for i in xrange(len(game.Game.entities)):
         ent = game.Game.entities[i]
         if ent.hp <= 0 or not ent.type in validTargets:
             continue
         dist = ent.center() - point
-        if abs(dir.angleBetween(dist)) > angle:
+        if abs(dir.angleBetween(dist)) > angle/2:
             continue
-        hits.append( RaycastEntry(dist.len(), ent) )
+        hits.append( RaycastEntry(valueFunc(ent, point, dir), ent) )
+        print "Entity %s => %.5f" % (ent, hits[-1].distance)
             
     def comp(a,b):
-        v = int(a.distance - b.distance)
+        v = a.distance - b.distance
         if v != 0:
-            return v / abs(v)
+            return int(v / abs(v))
         return 0
     hits.sort(comp)
-            
+    if len(hits)>0:  print "SELECTED: ent %s => %.5f" % (hits[0].entity, hits[0].distance)
     return hits
 
 #######################################################################

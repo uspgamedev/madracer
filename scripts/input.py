@@ -4,53 +4,7 @@
 import sfml as sf
 import random, math, pickle
 from game import Game
-from utils import Vector, getEntClosestTo, raycastQuery, coneQuery, GUIText
-
-##########################################
-# NOTES ABOUT INPUT
-##########################################
-#-While not particularly needed due to Python's duck typing, an input class should
-# follow the base InputInterface class interface
-#
-#-The input class should process events or poll input on update to determine
-# Game commands (as listed by InputInterface).
-#
-#-Game commands should then be passed along, there are 3 tiers of environment
-# that receives commands:
-#   -The Player: it polls target and move direction automatically, so there's no
-#    need to pass those commands, and fire/bomb commands should be passed directly
-#    to him.
-#   -The Game: object that manages the game, and the input. Pause and ChangeInput
-#    for example should be passed along to Game methods.
-#   -The MainLoop: the loop controls the Game, and is not accessible from anywhere.
-#    There are commands (like Toggle FPS/Fullscreen) that should be made available
-#    to be read by the loop
-#
-#-The Game itself has its own KeyEvent handler to process cheats and text-input
-# in the game over screen.
-#########################################
-"""
->>> colocar ID do gamepad
-
->>> generalizar gamepad pra user setar os bindings
->>> tela pra setar bindings
-
---- generalizar teclado e mouse(pra setar bindings)
-
->>> metodo pra ver se os inputs de teclado/mouse nao conflitam
-
-
-BINDING: map ação -> key/eixo
-action query:
--is_action_pressed: bool
--is_action_released: bool
--action_value: valor numerico da acao pra generalizar eixos ou botoes como eixos
-action process:
--processEvent: testa tipo e code(key)/button(mouse)/button(gamepad)
--compare com outro binding (tipo de evento e codigo deve ser generico a todos e suficiente pra testar)
->talvez tenha que ter implementacao para keyboard/mouse e gamepad (notando que keyboard e mouse talvez de pra fazer junto checando tipos
-
-"""
+from utils import Vector, getEntClosestTo, raycastQuery, coneQuery, ConeQueryType, GUIText
 
 class InputManager(object):
     def __init__(self):
@@ -361,10 +315,6 @@ class InputMethod(sf.Drawable):
             for i in xrange(2*4):
                 self.targetDirDisplay[i].color = self.player.color
         
-    def command_list(self): ###FIXME
-        # return input-specific command list: list of (command/key) pairs
-        return []
-        
     def move_dir(self):
         dir = Vector(0,0)
         if not self.valid():    return dir
@@ -374,7 +324,8 @@ class InputMethod(sf.Drawable):
         dir.y = -self.action_value(InputMethod.MOVE_UP)
         if dir.y == 0:
             dir.y = self.action_value(InputMethod.MOVE_DOWN)
-        dir.normalize()
+        if dir.squaredLen() > 1:
+            dir.normalize()
         return dir
         
     def processInput(self, e):
@@ -563,7 +514,7 @@ class InputMethod(sf.Drawable):
             mouse = sf.Mouse.get_position(Game.window)
             return getEntClosestTo(mouse)
         elif self.targeting_type == InputMethod.DIRECTIONAL_TARGETING:
-            query = coneQuery(self.player.center(), self.targeting_dir(), math.pi/4)
+            query = coneQuery(self.player.center(), self.targeting_dir(), math.pi/4, ConeQueryType.ANGLE_TO_DIR)
             if len(query) > 0:
                 return query[0].entity
         return None
